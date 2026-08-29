@@ -1,7 +1,23 @@
 {
   "task_id": "task-role-based-read-access",
   "task_description": "Extend the existing OAuth role-based authorization so that READ endpoints and pages are also gated by role, not only mutations. Students may view only their own results/sessions/history (ownership via authenticated email); staff may read admin/knowledge/evaluations data per role tiers; GET /api/knowledge becomes staff-only. Preserve the no-env build invariant and graceful demo mode when auth is not configured. All user-facing text in Spanish. Update README with the role->permission matrix. Work on branch feat/web-migration-vercel-neon; do not push.",
-  "status": "in_progress",
+  "status": "completed",
   "feature_order": ["FEAT-001", "FEAT-002"],
-  "blocked_reason": null
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "From web/: typecheck pass, lint pass (no warnings/errors), vitest 81 passed (68 prior + 6 read-access unit tests + 7 route-wiring tests), and no-env `next build` (all OAuth/DB/token/AI env vars unset) compiled successfully - preserving the no-env build invariant. test_quality: read-access.test.ts exercises the real authorizeSessionRead across all six ownership branches, and read-access-routes.test.ts drives the real route handlers with only getCurrentUser + DB/IO seams mocked so a dropped guard call fails CI. No Dockerfile for the web app, so docker_build skipped."
+  },
+  "review": {
+    "iterations": 2,
+    "final_verdict": "APPROVED",
+    "artifacts": [
+      "2026-08-29-173528-review.md (v1, NEEDS_CHANGES, 4 issues)",
+      "2026-08-29-174327-review.md (v2, APPROVED)"
+    ],
+    "residual_notes": "Non-blocking (v2): staff-proctor branch of POST /api/sessions takes the client-supplied studentEmail as the ownership key without validating it belongs to a known student (deliberate, documented; a proctor typo yields an orphaned staff-only session). Ordinary students remain non-spoofable."
+  }
 }
