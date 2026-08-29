@@ -154,12 +154,18 @@ Leyenda: ✅ permitido · ⛔ denegado · 🔒 solo si es el dueño de la sesió
 Un **STUDENT** solo puede leer los resultados y usar la IA sobre **sus propias
 sesiones**. La propiedad se determina y se aplica así:
 
-- **Al crear la sesión** (`POST /api/sessions`): si el usuario ha iniciado
-  sesión, el `student_email` de la sesión se fija con el **correo autenticado**,
-  **ignorando** el valor que envíe el cliente. Ese correo pasa a ser la **clave
-  de propiedad**. Si nadie ha iniciado sesión (anónimo/demo), se usa el
-  `studentEmail` que envía el cliente, como antes. El nombre para mostrar
-  (`studentName`) sí puede seguir viniendo del cliente.
+- **Al crear la sesión** (`POST /api/sessions`) la **clave de propiedad**
+  (`student_email`) se fija según quién crea la sesión:
+  - **STUDENT autenticado**: se usa **siempre** su **correo autenticado**,
+    **ignorando** el `studentEmail` del cliente. Así un estudiante **no puede
+    suplantar** la propiedad de otra persona (no falsificable).
+  - **Personal (staff) autenticado**: puede administrar el test **por cuenta de
+    un estudiante** (proctoring), por lo que se **respeta** el `studentEmail`
+    enviado por el cliente para asignar al **verdadero dueño**. Si no envía
+    ninguno, la sesión queda **sin dueño** (`null`) y solo la lee el personal.
+  - **Anónimo / demo** (sin OAuth): se usa el `studentEmail` que envía el
+    cliente, como antes.
+  - El nombre para mostrar (`studentName`) siempre puede venir del cliente.
 - **Al leer** (`/results/{id}`, `/api/ai/report`, `/api/ai/chat`): un STUDENT
   puede leer **solo** las sesiones cuyo `student_email` **coincida** con su
   correo autenticado (**sin distinguir mayúsculas/minúsculas**). El personal
@@ -167,8 +173,10 @@ sesiones**. La propiedad se determina y se aplica así:
 - Las sesiones con `student_email` **nulo o vacío** son **solo para personal**
   (ningún estudiante las puede leer).
 - Cuando un STUDENT que no es dueño intenta abrir `/results/{id}`, la página
-  muestra el componente **`AccessRestricted`** (en lugar de los resultados); las
-  rutas de IA devuelven **403**.
+  muestra el componente **`AccessRestricted`** con un mensaje **específico de
+  propiedad** ("No tienes permisos para ver los resultados de esta evaluación."),
+  no el texto genérico del área de administración; las rutas de IA devuelven
+  **403**.
 
 ### Modo demo / autenticación no configurada
 

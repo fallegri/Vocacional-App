@@ -10,6 +10,7 @@ import {
 } from "@/lib/riasec/engine";
 import { persistSession } from "@/lib/sessions";
 import { getCurrentUser } from "@/lib/auth/session";
+import { isStaffRole } from "@/lib/auth/roles";
 import type { AssessmentAnswer, DimensionCode } from "@/lib/riasec/types";
 
 // Fuerza el renderizado dinámico: nunca se ejecuta durante el build.
@@ -79,13 +80,26 @@ export async function POST(request: Request) {
   const dominantCode = getDominantCode(scores, 3);
   const dominantSummary = getDominantProfileDescription(dominantCode);
 
-  // Propiedad de la sesión: cuando hay un usuario autenticado NO confiamos en el
-  // correo enviado por el cliente; usamos el correo autenticado como clave de
-  // propiedad (owner). En modo demo/anónimo se conserva el valor del cliente.
+  // Propiedad de la sesión (clave de lectura por correo). Reglas:
+  //  - STUDENT autenticado: la propiedad se fija SIEMPRE a su correo autenticado
+  //    y se ignora el `studentEmail` del cliente. Así un estudiante no puede
+  //    suplantar la propiedad de otra persona (no falsificable).
+  //  - Personal (staff) autenticado: puede administrar el test por cuenta de un
+  //    estudiante (proctoring), por lo que se respeta el `studentEmail` enviado
+  //    por el cliente para asignar al verdadero dueño. Si no envía ninguno, se
+  //    deja sin dueño (null) y la sesión queda visible solo para personal.
+  //  - Anónimo / modo demo (sin OAuth): se conserva el valor del cliente.
   const currentUser = await getCurrentUser();
-  const ownerEmail = currentUser
-    ? currentUser.email
-    : body.studentEmail ?? null;
+  let ownerEmail: string | null;
+  if (!currentUser) {
+    ownerEmail = body.studentEmail ?? null;
+  } else if (isStaffRole(currentUser.role)) {
+    // Proctor: el correo del estudiante lo aporta el cliente (formulario staff).
+    ownerEmail = body.studentEmail ?? null;
+  } else {
+    // Estudiante autenticado: propiedad no falsificable = su propio correo.
+    ownerEmail = currentUser.email;
+  }
 
   const id = randomUUID();
   const completedAt = Date.now();

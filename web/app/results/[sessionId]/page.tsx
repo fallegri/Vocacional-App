@@ -91,10 +91,18 @@ export default async function ResultsPage({
   // (staff) pueden ver los resultados.
   const readAuth = await authorizeSessionRead(session);
   if (!readAuth.ok) {
+    // Un visitante con sesión que NO es dueño (ni personal) recibe el mensaje
+    // específico de propiedad que ya produjo la guarda ("No tienes permisos
+    // para ver los resultados de esta evaluación."), en lugar del texto genérico
+    // orientado al área de administración. Un visitante sin sesión conserva el
+    // texto por defecto con el botón de inicio de sesión.
+    const isNonOwner = Boolean(readAuth.user);
     return (
       <AccessRestricted
         redirectTo={`/results/${sessionId}`}
-        signedIn={Boolean(readAuth.user)}
+        signedIn={isNonOwner}
+        title={isNonOwner ? "Resultados no disponibles" : "Acceso restringido"}
+        message={isNonOwner ? readAuth.error : undefined}
       />
     );
   }

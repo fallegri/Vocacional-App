@@ -67,11 +67,22 @@ export async function POST(request: Request) {
   const ctx: TutorContext = {};
   const sessionId = (body.sessionId ?? "").trim();
   if (sessionId) {
-    let session = null;
+    // Distinguir "no encontrada" de "fallo al cargar":
+    //  - loadSession devuelve null cuando la sesión NO existe -> el tutor sigue
+    //    en modo general (sin contexto psicométrico), sin error.
+    //  - loadSession LANZA ante un fallo de base de datos -> se devuelve 5xx en
+    //    lugar de degradar en silencio una conversación con contexto/gating de
+    //    propiedad a un chat general sin fundamentar.
+    // Una conversación general SIN sessionId nunca entra aquí y sigue abierta.
+    let session;
     try {
       session = await loadSession(sessionId);
-    } catch {
-      // Sin contexto psicométrico: el tutor responde de forma general.
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "No se pudo cargar la sesión indicada.";
+      return NextResponse.json({ error: message }, { status: 500 });
     }
 
     if (session) {
