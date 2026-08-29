@@ -22,10 +22,15 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  // Guardia de personal: el dictamen del revisor es una operación de staff.
-  const auth = authorizeStaffRequest(request);
+  // Autorización por rol: el dictamen del revisor requiere REPORT_REVIEWER o
+  // SUPER_ADMIN. Con OAuth configurado la sesión decide; sin OAuth cae al
+  // fallback heredado (token / modo demo).
+  const auth = await authorizeStaffRequest(request, [
+    "REPORT_REVIEWER",
+    "SUPER_ADMIN",
+  ]);
   if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error }, { status: 403 });
   }
 
   const { id } = await params;

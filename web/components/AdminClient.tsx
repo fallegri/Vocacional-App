@@ -3,11 +3,6 @@
 import { useMemo, useState } from "react";
 import QrCode from "@/components/QrCode";
 import { createCohort } from "@/lib/actions/cohorts";
-import {
-  useStaffToken,
-  STAFF_TOKEN_HEADER,
-} from "@/components/useStaffToken";
-import StaffTokenField from "@/components/StaffTokenField";
 import { buildCohortTestUrl, normalizeCohortCode } from "@/lib/qr";
 import { DEFAULT_USERS } from "@/data/seed";
 import {
@@ -15,6 +10,7 @@ import {
   USER_ROLES,
   type CohortGroup,
   type ReviewStatusCode,
+  type UserRoleCode,
 } from "@/lib/riasec/types";
 import type { SessionSummary } from "@/lib/sessions";
 
@@ -40,26 +36,34 @@ function formatDate(ms: number | null): string {
 export default function AdminClient({
   initialCohorts,
   initialSessions,
-  staffAuthEnabled,
+  currentUser,
 }: {
   initialCohorts: CohortGroup[];
   initialSessions: SessionSummary[];
-  staffAuthEnabled: boolean;
+  /**
+   * Identidad real del usuario autenticado (email + rol) cuando OAuth está
+   * configurado. En modo demo (sin OAuth) es null y se muestra el selector de
+   * rol de prueba heredado.
+   */
+  currentUser: { email: string; role: UserRoleCode } | null;
 }) {
-  const { token: staffToken, setToken: setStaffToken } = useStaffToken();
-  // Selector de usuario/rol activo (la app Android no tiene auth real: siembra
-  // usuarios y permite cambiar de rol). Se documenta que OAuth real queda fuera
-  // de alcance (ver README / FEAT-005).
+  // Selector de usuario/rol de PRUEBA: solo se usa en modo demo (sin OAuth).
+  // Cuando hay sesión real (currentUser), la identidad y el rol vienen del
+  // servidor y este selector no se muestra.
   const [activeUserId, setActiveUserId] = useState<string>(
     DEFAULT_USERS.find((u) => u.role === "SUPER_ADMIN")?.id ??
       DEFAULT_USERS[0]?.id ??
       ""
   );
-  const activeUser =
+  const demoUser =
     DEFAULT_USERS.find((u) => u.id === activeUserId) ?? DEFAULT_USERS[0];
-  const activeRole = USER_ROLES[activeUser.role];
+
+  // Identidad efectiva: la sesión real si existe, si no el usuario de prueba.
+  const effectiveRole: UserRoleCode = currentUser?.role ?? demoUser.role;
+  const effectiveName = currentUser?.email ?? demoUser.displayName;
+  const activeRole = USER_ROLES[effectiveRole];
   const canManageCohorts =
-    activeUser.role === "SUPER_ADMIN" || activeUser.role === "TEST_ADMIN";
+    effectiveRole === "SUPER_ADMIN" || effectiveRole === "TEST_ADMIN";
 
   const [tab, setTab] = useState<TabKey>("evaluaciones");
 
@@ -132,23 +136,22 @@ export default function AdminClient({
       code: normalized,
       title: title.trim(),
       institution: institution.trim(),
-      creatorName: activeUser.displayName,
+      creatorName: effectiveName,
       description: description.trim(),
-      staffToken,
     });
     setPending(false);
 
-    // Si el servidor rechaza por autorización (token de personal ausente o
-    // inválido), NO generamos el QR: la operación no se realizó.
+    // Si el servidor rechaza por autorización (sesión de personal ausente o
+    // rol insuficiente), NO generamos el QR: la operación no se realizó.
     const unauthorized =
       !result.ok &&
       typeof result.error === "string" &&
-      /token de personal/i.test(result.error);
+      /(iniciar sesión|permisos suficientes|token de personal)/i.test(
+        result.error
+      );
 
     if (unauthorized) {
-      setError(
-        `${result.error} Introduce el token de acceso del personal y vuelve a intentarlo.`
-      );
+      setError(result.error ?? "No estás autorizado para crear cohortes.");
       return;
     }
 
@@ -167,7 +170,7 @@ export default function AdminClient({
           code: normalized,
           title: title.trim(),
           institution: institution.trim(),
-          creatorName: activeUser.displayName,
+          creatorName: effectiveName,
           isActive: true,
           description: description.trim(),
         },
@@ -207,7 +210,6 @@ export default function AdminClient({
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          ...(staffToken ? { [STAFF_TOKEN_HEADER]: staffToken } : {}),
         },
         body: JSON.stringify({
           reviewerNotes: notesDraft.trim(),
@@ -244,7 +246,7 @@ export default function AdminClient({
 
   return (
     <div className="stack" style={{ gap: 20 }}>
-      {/* Banner de rol + selector de usuario */}
+      {/* Banner de rol + (en modo demo) selector de usuario de prueba */}
       <div className="card">
         <div className="row spread" style={{ flexWrap: "wrap", gap: 12 }}>
           <div className="row" style={{ gap: 10, alignItems: "center" }}>
@@ -257,40 +259,36 @@ export default function AdminClient({
                 ) : null}
               </div>
               <div className="muted" style={{ fontSize: 13 }}>
-                {activeUser.displayName}
+                {effectiveName}
               </div>
             </div>
           </div>
-          <div>
-            <label className="label" htmlFor="active-user">
-              Actuar como (perfil de prueba)
-            </label>
-            <select
-              id="active-user"
-              className="select"
-              value={activeUserId}
-              onChange={(e) => setActiveUserId(e.target.value)}
-            >
-              {DEFAULT_USERS.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {USER_ROLES[u.role].title} · {u.displayName}
-                </option>
-              ))}
-            </select>
-          </div>
+          {currentUser ? null : (
+            <div>
+              <label className="label" htmlFor="active-user">
+                Actuar como (perfil de prueba)
+              </label>
+              <select
+                id="active-user"
+                className="select"
+                value={activeUserId}
+                onChange={(e) => setActiveUserId(e.target.value)}
+              >
+                {DEFAULT_USERS.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {USER_ROLES[u.role].title} · {u.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
         <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
-          Selector de rol de demostración: la app aún no incluye autenticación
-          real (OAuth queda fuera de alcance de esta etapa).
+          {currentUser
+            ? "Sesión iniciada con Google. Tu rol determina las operaciones permitidas."
+            : "Selector de rol de demostración: la autenticación con Google no está configurada en este entorno."}
         </p>
       </div>
-
-      {/* Token de personal (solo si el servidor lo exige) */}
-      <StaffTokenField
-        enabled={staffAuthEnabled}
-        token={staffToken}
-        setToken={setStaffToken}
-      />
 
       {/* Pestañas */}
       <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
@@ -558,7 +556,7 @@ export default function AdminClient({
                     <input
                       id="cohort-creator"
                       className="input"
-                      value={activeUser.displayName}
+                      value={effectiveName}
                       disabled
                     />
                   </div>

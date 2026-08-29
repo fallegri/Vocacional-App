@@ -1,7 +1,7 @@
 "use server";
 
 import { query } from "@/lib/db";
-import { authorizeStaff } from "@/lib/auth/staff";
+import { authorizeStaffWithRoles } from "@/lib/auth/staff";
 import {
   AI_PROVIDERS,
   resolveAiConfig,
@@ -57,12 +57,15 @@ export async function saveAiConfig(input: {
   apiKey: string;
   modelName: string;
   temperature: number;
-  /** Token de personal; obligatorio si STAFF_ACCESS_TOKEN está definido. */
+  /** Token de personal heredado; solo se usa como fallback si no hay OAuth. */
   staffToken?: string | null;
 }): Promise<SaveAiConfigResult> {
-  // Guardia de personal: reconfigurar el proveedor de IA (incluida la API key)
-  // es una operación sensible de staff.
-  const auth = authorizeStaff(input.staffToken);
+  // Autorización por rol: reconfigurar el proveedor de IA (incluida la API key)
+  // requiere SUPER_ADMIN o TEST_ADMIN. Con OAuth configurado la sesión decide.
+  const auth = await authorizeStaffWithRoles(
+    ["SUPER_ADMIN", "TEST_ADMIN"],
+    input.staffToken
+  );
   if (!auth.ok) {
     return { ok: false, error: auth.error };
   }

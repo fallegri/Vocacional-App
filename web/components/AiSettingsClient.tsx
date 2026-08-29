@@ -3,16 +3,12 @@
 import { useState } from "react";
 import { saveAiConfig, type AiConfigView } from "@/lib/actions/ai-config";
 import { AI_PROVIDERS, type AiProviderTypeCode } from "@/lib/ai/config";
-import { useStaffToken } from "@/components/useStaffToken";
-import StaffTokenField from "@/components/StaffTokenField";
 
 interface Props {
   initial: AiConfigView;
-  staffAuthEnabled: boolean;
 }
 
-export default function AiSettingsClient({ initial, staffAuthEnabled }: Props) {
-  const { token: staffToken, setToken: setStaffToken } = useStaffToken();
+export default function AiSettingsClient({ initial }: Props) {
   const [providerType, setProviderType] = useState<AiProviderTypeCode>(
     initial.providerType
   );
@@ -46,7 +42,6 @@ export default function AiSettingsClient({ initial, staffAuthEnabled }: Props) {
       apiKey: apiKey.trim(),
       modelName: modelName.trim(),
       temperature,
-      staffToken,
     });
     setPending(false);
 
@@ -182,12 +177,6 @@ export default function AiSettingsClient({ initial, staffAuthEnabled }: Props) {
             onChange={(e) => setTemperature(Number(e.target.value))}
           />
         </div>
-
-        <StaffTokenField
-          enabled={staffAuthEnabled}
-          token={staffToken}
-          setToken={setStaffToken}
-        />
 
         {error ? (
           <div className="alert alert-warning" role="alert">

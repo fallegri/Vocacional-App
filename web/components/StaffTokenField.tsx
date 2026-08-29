@@ -1,6 +1,12 @@
 "use client";
 
 /**
+ * @deprecated (FEAT-002) La autorización ahora es por ROL vía OAuth (Google).
+ * Este componente ya NO está conectado a la UI de administración; se conserva
+ * solo como referencia del antiguo flujo de token compartido
+ * (STAFF_ACCESS_TOKEN), que persiste únicamente como fallback local/demo en el
+ * servidor. No lo vuelvas a cablear en las pantallas de administración.
+ *
  * Campo para introducir el token de personal. Solo se muestra cuando el
  * servidor exige token (STAFF_ACCESS_TOKEN definido, `enabled === true`). El
  * valor se guarda en sessionStorage vía useStaffToken y se reenvía con cada

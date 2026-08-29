@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 
 /**
+ * @deprecated (FEAT-002) La autorización ahora es por ROL vía OAuth (Google) y
+ * este hook ya NO se usa en la UI de administración. Se conserva solo como
+ * referencia del antiguo flujo de token compartido (STAFF_ACCESS_TOKEN), que
+ * persiste únicamente como fallback local/demo en el servidor.
+ *
  * Token de personal (staff) para autorizar mutaciones cuando el servidor tiene
  * definido STAFF_ACCESS_TOKEN. Se guarda en sessionStorage (solo en el
  * navegador, se borra al cerrar la pestaña) y se reenvía con cada mutación:

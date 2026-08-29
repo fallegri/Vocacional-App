@@ -36,11 +36,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  // Guardia de personal: en producción (con STAFF_ACCESS_TOKEN definido) rechaza
-  // ingestas sin token válido. En modo demo (sin token) se permite.
-  const auth = authorizeStaffRequest(request);
+  // Autorización por rol: subir documentos a la base de conocimiento es una
+  // operación de cualquier personal (staff). Con OAuth configurado exige una
+  // sesión staff; sin OAuth cae al fallback heredado (token / modo demo).
+  const auth = await authorizeStaffRequest(request);
   if (!auth.ok) {
-    return NextResponse.json({ error: auth.error }, { status: 401 });
+    return NextResponse.json({ error: auth.error }, { status: 403 });
   }
 
   let body: IngestBody;

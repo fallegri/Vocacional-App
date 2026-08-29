@@ -1,27 +1,26 @@
 // ===========================================================================
-// Guardia mínima de autorización para operaciones de personal (staff).
+// Guardia de autorización para operaciones de personal (staff).
 //
-// La app aún NO tiene OAuth real (ver README > "Autenticación"). Este módulo
-// añade una barrera pragmática para las MUTACIONES del personal (crear
-// cohortes, guardar la configuración de IA, subir documentos a la base de
-// conocimiento y guardar el dictamen del revisor) sin requerir un proveedor
-// OAuth ni variables de entorno para que `next build` funcione.
+// A partir de FEAT-002 la autorización es PRINCIPALMENTE basada en ROLES vía
+// OAuth (Auth.js / Google). Cuando la autenticación está configurada
+// (isAuthConfigured() === true), la sesión del usuario y su rol son la única
+// puerta de acceso: el token compartido queda deshabilitado.
 //
-// Modelo:
-//  - Si `STAFF_ACCESS_TOKEN` NO está definido en el entorno del servidor, la app
-//    corre en "modo demo": las mutaciones se permiten (como hasta ahora) para no
-//    romper la demostración ni el build sin variables de entorno.
-//  - Si `STAFF_ACCESS_TOKEN` está definido, TODA mutación de personal exige que
-//    el cliente presente ese mismo token; de lo contrario se rechaza. Así, en
-//    un despliegue real basta con definir la variable para cerrar el acceso.
+// El antiguo STAFF_ACCESS_TOKEN se conserva ÚNICAMENTE como fallback local/demo:
+//  - isAuthConfigured() === false  &&  STAFF_ACCESS_TOKEN definido  -> se exige
+//    el token compartido (comportamiento heredado, útil en despliegues sin
+//    OAuth todavía).
+//  - isAuthConfigured() === false  &&  STAFF_ACCESS_TOKEN sin definir -> "modo
+//    demo": las mutaciones se permiten (para que `next build` sin variables de
+//    entorno y las demostraciones locales sigan funcionando).
 //
-// El token se compara SOLO en el servidor y nunca se envía al navegador. En la
-// UI el personal lo introduce en un campo y se reenvía con cada mutación.
-//
-// Esto NO sustituye a una autenticación real (OAuth / SSO / roles). Es una
-// barrera de despliegue mínima hasta implementar auth completa (fuera de alcance
-// de esta migración).
+// Todos los mensajes de cara al usuario están en español.
 // ===========================================================================
+
+import { isAuthConfigured } from "@/auth";
+import { getCurrentUser } from "@/lib/auth/session";
+import { isStaffRole } from "@/lib/auth/roles";
+import type { UserRoleCode } from "@/lib/riasec/types";
 
 export interface StaffAuthResult {
   ok: boolean;
@@ -29,11 +28,24 @@ export interface StaffAuthResult {
   error?: string;
 }
 
-/** Nombre de la cabecera HTTP donde la UI envía el token de personal. */
+/** Nombre de la cabecera HTTP donde la UI (heredada) envía el token de personal. */
 export const STAFF_TOKEN_HEADER = "x-staff-token";
 
-/** true si el servidor exige un token de personal (STAFF_ACCESS_TOKEN definido). */
+/** Mensaje estándar cuando falta una sesión de personal autorizada. */
+const NOT_STAFF_ERROR =
+  "Debes iniciar sesión con una cuenta de personal autorizada para realizar esta operación.";
+
+/** Mensaje estándar cuando el rol no alcanza para la operación solicitada. */
+const INSUFFICIENT_ROLE_ERROR =
+  "No tienes permisos suficientes para realizar esta operación.";
+
+/**
+ * true si el servidor exige un token de personal heredado. Ahora SOLO aplica
+ * como fallback: cuando la autenticación OAuth NO está configurada y hay un
+ * STAFF_ACCESS_TOKEN definido. Con OAuth configurado el token queda inactivo.
+ */
 export function isStaffAuthEnabled(): boolean {
+  if (isAuthConfigured()) return false;
   return (process.env.STAFF_ACCESS_TOKEN ?? "").trim().length > 0;
 }
 
@@ -51,11 +63,11 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 /**
- * Autoriza una mutación de personal a partir del token presentado.
- * Devuelve { ok: true } en modo demo (sin STAFF_ACCESS_TOKEN) o cuando el token
- * coincide; en caso contrario { ok: false, error }.
+ * Fallback heredado por token compartido. Solo se invoca cuando la auth OAuth
+ * NO está configurada. { ok: true } en modo demo (sin token configurado) o
+ * cuando el token presentado coincide.
  */
-export function authorizeStaff(presentedToken: string | null | undefined): StaffAuthResult {
+function authorizeByToken(presentedToken: string | null | undefined): StaffAuthResult {
   const expected = (process.env.STAFF_ACCESS_TOKEN ?? "").trim();
   if (!expected) {
     // Modo demo: sin token configurado, se permite (comportamiento previo).
@@ -77,14 +89,69 @@ export function authorizeStaff(presentedToken: string | null | undefined): Staff
 }
 
 /**
- * Extrae el token de personal de una petición entrante (route handlers).
- * Lo busca en la cabecera `x-staff-token`.
+ * Autoriza una mutación exigiendo que el usuario autenticado tenga uno de los
+ * `allowedRoles` (basado en rol vía OAuth). Si la auth NO está configurada, cae
+ * al fallback heredado (token compartido o modo demo).
+ *
+ * @param allowedRoles roles que pueden ejecutar la operación cuando hay OAuth.
+ * @param presentedToken token heredado opcional (solo usado en el fallback).
+ */
+export async function authorizeStaffWithRoles(
+  allowedRoles: UserRoleCode[],
+  presentedToken?: string | null
+): Promise<StaffAuthResult> {
+  if (!isAuthConfigured()) {
+    // Sin OAuth: fallback local/demo por token compartido.
+    return authorizeByToken(presentedToken);
+  }
+
+  // Con OAuth configurado, la sesión + rol es la única puerta de acceso.
+  const user = await getCurrentUser();
+  if (!user || !isStaffRole(user.role)) {
+    return { ok: false, error: NOT_STAFF_ERROR };
+  }
+  if (!allowedRoles.includes(user.role)) {
+    return { ok: false, error: INSUFFICIENT_ROLE_ERROR };
+  }
+  return { ok: true };
+}
+
+/**
+ * Autoriza una mutación de CUALQUIER personal (staff). Con OAuth configurado
+ * exige un rol staff; sin OAuth cae al fallback heredado.
+ */
+export async function authorizeStaff(
+  presentedToken?: string | null
+): Promise<StaffAuthResult> {
+  return authorizeStaffWithRoles(
+    ["SUPER_ADMIN", "TEST_ADMIN", "REPORT_REVIEWER"],
+    presentedToken
+  );
+}
+
+/**
+ * Extrae el token de personal heredado de una petición entrante (route
+ * handlers). Lo busca en la cabecera `x-staff-token`.
  */
 export function getStaffTokenFromRequest(request: Request): string | null {
   return request.headers.get(STAFF_TOKEN_HEADER);
 }
 
-/** Autoriza una mutación de personal a partir de una Request. */
-export function authorizeStaffRequest(request: Request): StaffAuthResult {
-  return authorizeStaff(getStaffTokenFromRequest(request));
+/**
+ * Autoriza una mutación de personal a partir de una Request, exigiendo uno de
+ * los `allowedRoles` cuando hay OAuth (o el fallback por token en su ausencia).
+ * Por defecto admite cualquier rol staff.
+ */
+export async function authorizeStaffRequest(
+  request: Request,
+  allowedRoles: UserRoleCode[] = [
+    "SUPER_ADMIN",
+    "TEST_ADMIN",
+    "REPORT_REVIEWER",
+  ]
+): Promise<StaffAuthResult> {
+  return authorizeStaffWithRoles(
+    allowedRoles,
+    getStaffTokenFromRequest(request)
+  );
 }

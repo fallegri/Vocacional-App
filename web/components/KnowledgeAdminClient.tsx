@@ -1,11 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  useStaffToken,
-  STAFF_TOKEN_HEADER,
-} from "@/components/useStaffToken";
-import StaffTokenField from "@/components/StaffTokenField";
 
 type SourceType = "BOOK" | "RESEARCH" | "ARTICLE";
 
@@ -34,12 +29,7 @@ function formatDate(ms: number): string {
   }
 }
 
-export default function KnowledgeAdminClient({
-  staffAuthEnabled,
-}: {
-  staffAuthEnabled: boolean;
-}) {
-  const { token: staffToken, setToken: setStaffToken } = useStaffToken();
+export default function KnowledgeAdminClient() {
   const [title, setTitle] = useState("");
   const [sourceType, setSourceType] = useState<SourceType>("BOOK");
   const [sourceReference, setSourceReference] = useState("");
@@ -84,7 +74,6 @@ export default function KnowledgeAdminClient({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(staffToken ? { [STAFF_TOKEN_HEADER]: staffToken } : {}),
         },
         body: JSON.stringify({
           title: title.trim(),
@@ -193,11 +182,6 @@ export default function KnowledgeAdminClient({
               placeholder="Pega aquí el texto del libro, investigación o artículo…"
             />
           </div>
-          <StaffTokenField
-            enabled={staffAuthEnabled}
-            token={staffToken}
-            setToken={setStaffToken}
-          />
           {error ? (
             <div className="alert alert-warning" role="alert">
               {error}

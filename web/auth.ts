@@ -24,6 +24,7 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import { resolveRoleForEmail } from "@/lib/auth/roles";
+import { linkOrCreateUser } from "@/lib/auth/link-user";
 
 /**
  * true solo cuando GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y AUTH_SECRET están
@@ -72,6 +73,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth(() => {
           }
         }
         return session;
+      },
+    },
+    events: {
+      // Al iniciar sesión, vincula/crea la fila en app_users (best-effort, solo
+      // si DATABASE_URL está definida). Un fallo aquí no bloquea el login.
+      async signIn({ user }) {
+        await linkOrCreateUser(user?.email, user?.name);
       },
     },
   };

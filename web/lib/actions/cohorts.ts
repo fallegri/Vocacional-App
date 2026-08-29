@@ -2,7 +2,7 @@
 
 import { query } from "@/lib/db";
 import { DEFAULT_COHORTS } from "@/data/seed";
-import { authorizeStaff } from "@/lib/auth/staff";
+import { authorizeStaffWithRoles } from "@/lib/auth/staff";
 import type { CohortGroup } from "@/lib/riasec/types";
 
 export interface CreateCohortResult {
@@ -58,11 +58,15 @@ export async function createCohort(input: {
   institution: string;
   creatorName: string;
   description?: string;
-  /** Token de personal; obligatorio si STAFF_ACCESS_TOKEN está definido. */
+  /** Token de personal heredado; solo se usa como fallback si no hay OAuth. */
   staffToken?: string | null;
 }): Promise<CreateCohortResult> {
-  // Guardia de personal: crear una cohorte es una operación de staff.
-  const auth = authorizeStaff(input.staffToken);
+  // Autorización por rol: crear una cohorte requiere SUPER_ADMIN o TEST_ADMIN.
+  // Con OAuth configurado la sesión decide; sin OAuth cae al fallback heredado.
+  const auth = await authorizeStaffWithRoles(
+    ["SUPER_ADMIN", "TEST_ADMIN"],
+    input.staffToken
+  );
   if (!auth.ok) {
     return { ok: false, error: auth.error };
   }
