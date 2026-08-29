@@ -40,3 +40,24 @@ export function buildCohortTestUrl(
   const path = `/g/${encodeURIComponent(normalized)}`;
   return base ? `${base}${path}` : path;
 }
+
+/**
+ * Construye la URL de destino de la ruta corta /g/{code}: la evaluación con la
+ * cohorte aplicada y, si el grupo tiene un método asignado, con ese método.
+ * Cuando `methodId` es nulo o "RIASEC" (el método por defecto) se omite el
+ * parámetro `method` para mantener las URLs de RIASEC idénticas a las previas.
+ * Función pura (sin E/S) para poder probarla sin base de datos.
+ */
+export function buildAssessmentRedirectPath(
+  cohortCode: string,
+  methodId?: string | null
+): string {
+  const normalized = normalizeCohortCode(cohortCode);
+  const params = new URLSearchParams();
+  params.set("cohort", normalized);
+  const method = (methodId ?? "").trim().toUpperCase();
+  if (method && method !== "RIASEC") {
+    params.set("method", method);
+  }
+  return `/assessment?${params.toString()}`;
+}

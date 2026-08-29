@@ -1,30 +1,76 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { QUESTIONS } from "@/data/seed";
+import type {
+  MethodDimension,
+  MethodId,
+  MethodQuestion,
+  ResponseScale,
+} from "@/lib/methods/types";
 import { DIMENSION_META } from "@/lib/riasec/types";
 
-const LIKERT = [
-  { value: 1, label: "Nada" },
-  { value: 2, label: "Poco" },
-  { value: 3, label: "Neutral" },
-  { value: 4, label: "Bastante" },
-  { value: 5, label: "Mucho" },
-];
+/**
+ * Datos serializables de un método vocacional que el servidor pasa al cliente.
+ * (Las funciones score() viven solo en el servidor; el cliente solo necesita
+ * los ítems y la escala para renderizar el cuestionario.)
+ */
+export interface MethodOption {
+  id: MethodId;
+  name: string;
+  shortDescription: string;
+  scale: ResponseScale;
+  dimensions: MethodDimension[];
+  questions: MethodQuestion[];
+}
 
 interface RecordedAnswer {
   score: number;
   timeSpentMs: number;
 }
 
+/** Color de una dimensión: usa el color RIASEC si existe; si no, uno neutro. */
+function dimensionColor(
+  methodId: MethodId,
+  dimensions: MethodDimension[],
+  code: string
+): string {
+  if (methodId === "RIASEC" && code in DIMENSION_META) {
+    return DIMENSION_META[code as keyof typeof DIMENSION_META].color;
+  }
+  const dim = dimensions.find((d) => d.code === code);
+  return dim?.color ?? "#4F46E5";
+}
+
+/** Título legible de una dimensión para el "chip" sobre cada pregunta. */
+function dimensionTitle(
+  dimensions: MethodDimension[],
+  code: string
+): string {
+  const dim = dimensions.find((d) => d.code === code);
+  return dim?.title ?? code;
+}
+
 export default function AssessmentClient({
   cohortCode,
+  methods,
+  preselectedMethodId,
+  methodLocked = false,
 }: {
   cohortCode?: string | null;
+  methods: MethodOption[];
+  preselectedMethodId: MethodId;
+  methodLocked?: boolean;
 }) {
   const router = useRouter();
-  const questions = QUESTIONS;
+
+  const [methodId, setMethodId] = useState<MethodId>(preselectedMethodId);
+  const method = useMemo(
+    () => methods.find((m) => m.id === methodId) ?? methods[0],
+    [methods, methodId]
+  );
+
+  const questions = method.questions;
   const total = questions.length;
 
   const [index, setIndex] = useState(0);
@@ -40,11 +86,26 @@ export default function AssessmentClient({
   const shownAtRef = useRef<number>(Date.now());
   const startedAtRef = useRef<number>(Date.now());
 
+  // Al cambiar de método, se reinicia el cuestionario (respuestas y posición).
+  useEffect(() => {
+    setAnswers(new Map());
+    setIndex(0);
+    shownAtRef.current = Date.now();
+    startedAtRef.current = Date.now();
+  }, [methodId]);
+
   const question = questions[index];
-  const meta = DIMENSION_META[question.dimension];
   const answeredCount = answers.size;
-  const progress = Math.round((answeredCount / total) * 100);
+  const progress = total > 0 ? Math.round((answeredCount / total) * 100) : 0;
   const currentAnswer = answers.get(question.id);
+
+  const isRiasec = methodId === "RIASEC";
+  const scaleOptions = method.scale.options;
+  const chipColor = dimensionColor(methodId, method.dimensions, question.dimension);
+  const chipTitle = isRiasec
+    ? (DIMENSION_META[question.dimension as keyof typeof DIMENSION_META]?.title ??
+       question.dimension)
+    : dimensionTitle(method.dimensions, question.dimension);
 
   const allAnswered = useMemo(
     () => questions.every((q) => answers.has(q.id)),
@@ -91,6 +152,7 @@ export default function AssessmentClient({
         studentName: studentName.trim() || null,
         studentEmail: studentEmail.trim() || null,
         startedAt: startedAtRef.current,
+        methodId,
       };
       const res = await fetch("/api/sessions", {
         method: "POST",
@@ -112,12 +174,25 @@ export default function AssessmentClient({
     }
   };
 
+  // Etiquetas de extremos de la escala (para RIASEC/Likert-5 se mantienen las
+  // clásicas; para otras escalas se derivan de la primera/última opción).
+  const lowLabel = isRiasec
+    ? "1 · Ningún interés"
+    : `${scaleOptions[scaleOptions.length - 1]?.label ?? ""}`;
+  const highLabel = isRiasec
+    ? "5 · Máximo interés"
+    : `${scaleOptions[0]?.label ?? ""}`;
+
   return (
     <div className="stack" style={{ gap: 20 }}>
       <div className="card">
         <div className="row spread">
           <div>
-            <h1 style={{ margin: 0 }}>Evaluación Vocacional RIASEC</h1>
+            <h1 style={{ margin: 0 }}>
+              {isRiasec
+                ? "Evaluación Vocacional RIASEC"
+                : `Evaluación Vocacional ${method.name}`}
+            </h1>
             <p className="muted" style={{ margin: "4px 0 0" }}>
               Responde con honestidad según tu nivel de interés.
             </p>
@@ -127,6 +202,46 @@ export default function AssessmentClient({
               Grupo: {cohortCode}
             </span>
           ) : null}
+        </div>
+
+        {/* Selector de método (o método fijado por la cohorte). */}
+        <div style={{ marginTop: 16 }}>
+          <label className="label" htmlFor="method-select">
+            Método de evaluación
+          </label>
+          {methodLocked ? (
+            <div>
+              <span
+                className="badge"
+                data-testid="method-selector"
+                data-method-id={methodId}
+              >
+                Método asignado: {method.name}
+              </span>
+              <p className="muted" style={{ margin: "6px 0 0", fontSize: 13 }}>
+                Este grupo tiene un método asignado. No es posible cambiarlo.
+              </p>
+            </div>
+          ) : (
+            <>
+              <select
+                id="method-select"
+                className="input"
+                data-testid="method-selector"
+                value={methodId}
+                onChange={(e) => setMethodId(e.target.value as MethodId)}
+              >
+                {methods.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              <p className="muted" style={{ margin: "6px 0 0", fontSize: 13 }}>
+                {method.shortDescription}
+              </p>
+            </>
+          )}
         </div>
 
         <div className="grid grid-2" style={{ marginTop: 16 }}>
@@ -174,9 +289,9 @@ export default function AssessmentClient({
         <div style={{ marginTop: 20 }}>
           <span
             className="chip"
-            style={{ color: meta.color, borderColor: meta.color }}
+            style={{ color: chipColor, borderColor: chipColor }}
           >
-            {meta.title}
+            {chipTitle}
           </span>
           <p
             data-testid="question-text"
@@ -185,8 +300,12 @@ export default function AssessmentClient({
             {question.text}
           </p>
 
-          <div className="likert" role="group" aria-label="Escala del 1 al 5">
-            {LIKERT.map((opt) => (
+          <div
+            className="likert"
+            role="group"
+            aria-label={`Escala de respuesta ${method.name}`}
+          >
+            {scaleOptions.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
@@ -201,8 +320,8 @@ export default function AssessmentClient({
             ))}
           </div>
           <div className="likert-scale-labels">
-            <span>1 · Ningún interés</span>
-            <span>5 · Máximo interés</span>
+            <span>{lowLabel}</span>
+            <span>{highLabel}</span>
           </div>
         </div>
 

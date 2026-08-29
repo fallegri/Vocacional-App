@@ -241,4 +241,9 @@ export interface CohortGroup {
   creatorName: string;
   isActive: boolean;
   description: string;
+  /**
+   * Método vocacional asignado al grupo. Opcional para compatibilidad con las
+   * cohortes semilla; cuando está ausente se asume "RIASEC" (método por defecto).
+   */
+  methodId?: string;
 }

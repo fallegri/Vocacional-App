@@ -8,10 +8,17 @@ import {
   getDominantCode,
   getDominantProfileDescription,
 } from "@/lib/riasec/engine";
-import { persistSession } from "@/lib/sessions";
+import { persistSession, type StoredMethodScores } from "@/lib/sessions";
 import { getCurrentUser } from "@/lib/auth/session";
 import { isStaffRole } from "@/lib/auth/roles";
-import type { AssessmentAnswer, DimensionCode } from "@/lib/riasec/types";
+import { getMethod, normalizeMethodId } from "@/lib/methods/registry";
+import type { MethodAnswer } from "@/lib/methods/types";
+import type {
+  AssessmentAnswer,
+  DimensionCode,
+  PsychometricScores,
+  QualityMetric,
+} from "@/lib/riasec/types";
 
 // Fuerza el renderizado dinámico: nunca se ejecuta durante el build.
 export const dynamic = "force-dynamic";
@@ -29,9 +36,31 @@ interface CreateSessionBody {
   studentName?: string | null;
   studentEmail?: string | null;
   startedAt?: number;
+  methodId?: string | null;
 }
 
 const QUESTION_BY_ID = new Map(QUESTIONS.map((q) => [q.id, q]));
+
+/** Puntajes neutros (0) para las columnas r/i/a/s/e/c en métodos no-RIASEC. */
+const NEUTRAL_SCORES: PsychometricScores = {
+  r: 0,
+  i: 0,
+  a: 0,
+  s: 0,
+  e: 0,
+  c: 0,
+};
+
+/** Calidad neutra para métodos no-RIASEC (no aplican pares espejo/tiempos). */
+const NEUTRAL_QUALITY: QualityMetric = {
+  isValid: true,
+  straightLiningDetected: false,
+  averageResponseTimeMs: 0,
+  speedTrapTriggered: false,
+  mirrorConsistencyPercent: 100,
+  reliabilityLevel: "Alta",
+  warningMessage: null,
+};
 
 export async function POST(request: Request) {
   let body: CreateSessionBody;
@@ -51,34 +80,99 @@ export async function POST(request: Request) {
     );
   }
 
-  // Normaliza las respuestas contra el catálogo de preguntas semilla.
-  const answersMap = new Map<number, AssessmentAnswer>();
-  for (const raw of body.answers) {
-    const question = QUESTION_BY_ID.get(raw.questionId);
-    if (!question) continue;
-    const score = Math.round(Number(raw.score));
-    if (!Number.isFinite(score) || score < 1 || score > 5) continue;
-    const answer: AssessmentAnswer = {
-      questionId: question.id,
-      dimension: question.dimension as DimensionCode,
-      score,
-      timeSpentMs: Math.max(0, Math.trunc(Number(raw.timeSpentMs) || 0)),
+  // Método elegido por el usuario/cohorte. Cualquier valor desconocido o
+  // ausente vuelve al método por defecto (RIASEC).
+  const methodId = normalizeMethodId(body.methodId);
+
+  // --- Datos comunes a persistir; se rellenan según el método elegido. ---
+  let scores: PsychometricScores = NEUTRAL_SCORES;
+  let quality: QualityMetric = NEUTRAL_QUALITY;
+  let careerMatches: ReturnType<typeof matchCareers> = [];
+  let dominantCode = "";
+  let dominantSummary = "";
+  let answersToPersist: AssessmentAnswer[] = [];
+  let methodScores: StoredMethodScores | null = null;
+
+  if (methodId === "RIASEC") {
+    // ------------------------------------------------------------------
+    // Camino RIASEC: equivalente byte a byte al comportamiento anterior.
+    // ------------------------------------------------------------------
+    const answersMap = new Map<number, AssessmentAnswer>();
+    for (const raw of body.answers) {
+      const question = QUESTION_BY_ID.get(raw.questionId);
+      if (!question) continue;
+      const score = Math.round(Number(raw.score));
+      if (!Number.isFinite(score) || score < 1 || score > 5) continue;
+      const answer: AssessmentAnswer = {
+        questionId: question.id,
+        dimension: question.dimension as DimensionCode,
+        score,
+        timeSpentMs: Math.max(0, Math.trunc(Number(raw.timeSpentMs) || 0)),
+      };
+      answersMap.set(question.id, answer);
+    }
+
+    if (answersMap.size === 0) {
+      return NextResponse.json(
+        { error: "Ninguna respuesta válida fue recibida." },
+        { status: 400 }
+      );
+    }
+
+    scores = calculateScores(answersMap, QUESTIONS);
+    quality = evaluateQuality(answersMap, QUESTIONS);
+    careerMatches = matchCareers(scores, CAREERS);
+    dominantCode = getDominantCode(scores, 3);
+    dominantSummary = getDominantProfileDescription(dominantCode);
+    answersToPersist = Array.from(answersMap.values());
+  } else {
+    // ------------------------------------------------------------------
+    // Métodos genéricos (CHASIDE, TIPOV): validan contra el banco de ítems
+    // y la escala del método, ejecutan su score() puro y guardan los
+    // puntajes por dimensión en method_scores (r/i/a/s/e/c quedan en 0).
+    // ------------------------------------------------------------------
+    const method = getMethod(methodId);
+    const questionById = new Map(method.questions.map((q) => [q.id, q]));
+    const allowedValues = new Set(method.scale.options.map((o) => o.value));
+
+    const methodAnswers: MethodAnswer[] = [];
+    const responseAnswers: AssessmentAnswer[] = [];
+    const seen = new Set<number>();
+    for (const raw of body.answers) {
+      const question = questionById.get(raw.questionId);
+      if (!question) continue;
+      if (seen.has(raw.questionId)) continue;
+      const value = Number(raw.score);
+      if (!Number.isFinite(value) || !allowedValues.has(value)) continue;
+      seen.add(raw.questionId);
+      methodAnswers.push({ questionId: question.id, value });
+      responseAnswers.push({
+        questionId: question.id,
+        // Reutilizamos la tabla de respuestas guardando el código de dimensión
+        // del método (no es un DimensionCode RIASEC, pero la columna es TEXT).
+        dimension: question.dimension as DimensionCode,
+        score: value,
+        timeSpentMs: Math.max(0, Math.trunc(Number(raw.timeSpentMs) || 0)),
+      });
+    }
+
+    if (methodAnswers.length === 0) {
+      return NextResponse.json(
+        { error: "Ninguna respuesta válida fue recibida." },
+        { status: 400 }
+      );
+    }
+
+    const result = method.score(methodAnswers);
+    dominantCode = result.dominantCodes.join("");
+    dominantSummary = result.dominantSummary;
+    answersToPersist = responseAnswers;
+    methodScores = {
+      dimensionScores: result.dimensionScores,
+      dominantCodes: result.dominantCodes,
+      interpretation: result.interpretation,
     };
-    answersMap.set(question.id, answer);
   }
-
-  if (answersMap.size === 0) {
-    return NextResponse.json(
-      { error: "Ninguna respuesta válida fue recibida." },
-      { status: 400 }
-    );
-  }
-
-  const scores = calculateScores(answersMap, QUESTIONS);
-  const quality = evaluateQuality(answersMap, QUESTIONS);
-  const careerMatches = matchCareers(scores, CAREERS);
-  const dominantCode = getDominantCode(scores, 3);
-  const dominantSummary = getDominantProfileDescription(dominantCode);
 
   // Propiedad de la sesión (clave de lectura por correo). Reglas:
   //  - STUDENT autenticado: la propiedad se fija SIEMPRE a su correo autenticado
@@ -118,10 +212,12 @@ export async function POST(request: Request) {
       dominantCode,
       dominantSummary,
       careerMatches,
-      answers: Array.from(answersMap.values()),
+      answers: answersToPersist,
       cohortCode: body.cohortCode ?? null,
       studentName: body.studentName ?? null,
       studentEmail: ownerEmail,
+      methodId,
+      methodScores,
     });
   } catch (err) {
     const message =

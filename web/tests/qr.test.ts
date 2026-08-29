@@ -3,6 +3,7 @@ import {
   normalizeCohortCode,
   resolveBaseUrl,
   buildCohortTestUrl,
+  buildAssessmentRedirectPath,
 } from "@/lib/qr";
 
 describe("normalizeCohortCode", () => {
@@ -50,5 +51,40 @@ describe("buildCohortTestUrl", () => {
   it("devuelve ruta relativa si no hay origin", () => {
     delete process.env.NEXT_PUBLIC_APP_URL;
     expect(buildCohortTestUrl("BIO-2026-C")).toBe("/g/BIO-2026-C");
+  });
+});
+
+describe("buildAssessmentRedirectPath", () => {
+  it("incluye el método asignado a la cohorte cuando es distinto de RIASEC", () => {
+    expect(buildAssessmentRedirectPath("BIO-2026-C", "CHASIDE")).toBe(
+      "/assessment?cohort=BIO-2026-C&method=CHASIDE"
+    );
+    expect(buildAssessmentRedirectPath("grp-1", "tipov")).toBe(
+      "/assessment?cohort=GRP-1&method=TIPOV"
+    );
+  });
+
+  it("omite el parámetro method cuando el método es RIASEC (por defecto)", () => {
+    expect(buildAssessmentRedirectPath("BIO-2026-C", "RIASEC")).toBe(
+      "/assessment?cohort=BIO-2026-C"
+    );
+    expect(buildAssessmentRedirectPath("BIO-2026-C", "riasec")).toBe(
+      "/assessment?cohort=BIO-2026-C"
+    );
+  });
+
+  it("omite el parámetro method cuando la cohorte no tiene método asignado", () => {
+    expect(buildAssessmentRedirectPath("BIO-2026-C", null)).toBe(
+      "/assessment?cohort=BIO-2026-C"
+    );
+    expect(buildAssessmentRedirectPath("BIO-2026-C")).toBe(
+      "/assessment?cohort=BIO-2026-C"
+    );
+  });
+
+  it("normaliza el código de cohorte (mayúsculas, sin espacios)", () => {
+    expect(buildAssessmentRedirectPath("  med-2026 ", "CHASIDE")).toBe(
+      "/assessment?cohort=MED-2026&method=CHASIDE"
+    );
   });
 });

@@ -2,7 +2,7 @@ import Link from "next/link";
 import RadarChart from "@/components/RadarChart";
 import AiReportClient from "@/components/AiReportClient";
 import AccessRestricted from "@/components/AccessRestricted";
-import { loadSession } from "@/lib/sessions";
+import { loadSession, type StoredSession } from "@/lib/sessions";
 import { authorizeSessionRead } from "@/lib/auth/read-access";
 import { matchCareers } from "@/lib/riasec/engine";
 import { CAREERS } from "@/data/seed";
@@ -104,6 +104,16 @@ export default async function ResultsPage({
         title={isNonOwner ? "Resultados no disponibles" : "Acceso restringido"}
         message={isNonOwner ? readAuth.error : undefined}
       />
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // Métodos distintos de RIASEC: vista de resultados genérica en español
+  // construida a partir de method_scores (sin radar/carreras/AI RIASEC).
+  // ---------------------------------------------------------------------
+  if (session.methodId !== "RIASEC") {
+    return (
+      <GenericMethodResults session={session} sessionId={sessionId} />
     );
   }
 
@@ -230,6 +240,159 @@ export default async function ResultsPage({
             Explorar todas las carreras
           </Link>
         </div>
+      </div>
+    </main>
+  );
+}
+
+/**
+ * Vista de resultados genérica para métodos distintos de RIASEC (CHASIDE,
+ * TIPOV). Se construye desde method_scores: barras por dimensión, áreas
+ * dominantes e interpretación. Para CHASIDE muestra la comparación
+ * Interés-vs-Aptitud usando los conteos crudos por área.
+ */
+function GenericMethodResults({
+  session,
+  sessionId,
+}: {
+  session: StoredSession;
+  sessionId: string;
+}) {
+  const ms = session.methodScores;
+
+  if (!ms || ms.dimensionScores.length === 0) {
+    return (
+      <main className="container">
+        <div className="row spread" style={{ marginBottom: 16 }}>
+          <div>
+            <h1 style={{ margin: 0 }}>Tu Perfil Vocacional</h1>
+            <p className="muted" style={{ margin: "4px 0 0" }}>
+              Método: {session.methodId}
+              {session.cohortCode ? ` · Grupo ${session.cohortCode}` : ""}
+            </p>
+          </div>
+          <span className="badge" data-testid="method-badge">
+            Método: {session.methodId}
+          </span>
+        </div>
+        <div className="alert alert-warning" role="status">
+          No hay puntajes por dimensión disponibles para esta evaluación.
+        </div>
+        <p style={{ marginTop: 16 }}>
+          <Link href="/assessment" className="btn btn-secondary">
+            Iniciar una nueva evaluación
+          </Link>
+        </p>
+      </main>
+    );
+  }
+
+  const isChaside = session.methodId === "CHASIDE";
+
+  // CHASIDE guarda por área dos entradas (Interés y Aptitud) diferenciadas por
+  // el sufijo del código (p. ej. "C-INTERES" / "C-APTITUD"). Si el motor usa
+  // otra convención, se muestran igualmente todas las dimensiones como barras.
+  const sorted = [...ms.dimensionScores].sort((a, b) => b.value - a.value);
+
+  return (
+    <main className="container">
+      <div className="row spread" style={{ marginBottom: 16 }}>
+        <div>
+          <h1 style={{ margin: 0 }}>Tu Perfil Vocacional</h1>
+          <p className="muted" style={{ margin: "4px 0 0" }}>
+            {session.studentName
+              ? `Resultados de ${session.studentName}`
+              : `Resultados del test ${session.methodId}`}
+            {session.cohortCode ? ` · Grupo ${session.cohortCode}` : ""}
+          </p>
+        </div>
+        <span className="badge" data-testid="method-badge">
+          Método: {session.methodId}
+        </span>
+      </div>
+
+      {session.dominantCode ? (
+        <div className="alert alert-ok" role="status">
+          <strong>Áreas dominantes: {session.dominantCode}.</strong>{" "}
+          {ms.dominantCodes.length > 0
+            ? `Perfil destacado en: ${ms.dominantCodes.join(", ")}.`
+            : ""}
+        </div>
+      ) : null}
+
+      {/* Barras por dimensión */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Puntajes por dimensión</h2>
+        <div className="stack">
+          {sorted.map((dim) => {
+            const value = Math.round(dim.value);
+            return (
+              <div key={dim.code}>
+                <div className="row spread" style={{ marginBottom: 4 }}>
+                  <span style={{ fontWeight: 600 }}>
+                    <span>{dim.code}</span> · {dim.title}
+                  </span>
+                  <span className="muted">
+                    {value}%
+                    {typeof dim.raw === "number"
+                      ? ` (${dim.raw} pts)`
+                      : ""}
+                  </span>
+                </div>
+                <div className="row">
+                  <div className="dimension-bar-track">
+                    <div
+                      className="dimension-bar-fill"
+                      style={{ width: `${value}%`, background: "#4F46E5" }}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {isChaside ? (
+        <div className="card" style={{ marginTop: 16 }}>
+          <h2 style={{ marginTop: 0 }}>Interés vs. Aptitud</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            CHASIDE evalúa por separado tus <strong>intereses</strong> y tus{" "}
+            <strong>aptitudes</strong> en cada área. Un perfil alineado muestra
+            interés y aptitud altos en las mismas áreas.
+          </p>
+          <div className="stack">
+            {sorted.map((dim) => (
+              <div
+                key={`chaside-${dim.code}`}
+                className="row spread"
+                style={{ fontSize: 14 }}
+              >
+                <span>
+                  {dim.code} · {dim.title}
+                </span>
+                <span className="muted">{Math.round(dim.value)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Interpretación */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Interpretación</h2>
+        <p style={{ marginBottom: 0 }}>
+          {ms.interpretation || session.dominantSummary || "Sin interpretación disponible."}
+        </p>
+      </div>
+
+      <div className="card center" style={{ marginTop: 16 }}>
+        <Link
+          href={`/tutor?session=${encodeURIComponent(sessionId)}`}
+          className="btn btn-secondary"
+        >
+          Conversar con el Tutor IA
+        </Link>
       </div>
     </main>
   );

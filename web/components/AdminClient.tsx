@@ -13,8 +13,16 @@ import {
   type UserRoleCode,
 } from "@/lib/riasec/types";
 import type { SessionSummary } from "@/lib/sessions";
+import type { MethodId } from "@/lib/methods/types";
 
 type TabKey = "evaluaciones" | "cohortes" | "usuarios";
+
+/** Métodos disponibles para asignar a una cohorte (nombre visible en español). */
+const METHOD_OPTIONS: Array<{ id: MethodId; name: string }> = [
+  { id: "RIASEC", name: "RIASEC (Holland)" },
+  { id: "CHASIDE", name: "CHASIDE" },
+  { id: "TIPOV", name: "TIPOV" },
+];
 
 const REVIEW_STATUS_CODES = Object.keys(REVIEW_STATUS) as ReviewStatusCode[];
 
@@ -73,6 +81,7 @@ export default function AdminClient({
   const [title, setTitle] = useState("");
   const [institution, setInstitution] = useState("");
   const [description, setDescription] = useState("");
+  const [methodId, setMethodId] = useState<MethodId>("RIASEC");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -138,6 +147,7 @@ export default function AdminClient({
       institution: institution.trim(),
       creatorName: effectiveName,
       description: description.trim(),
+      methodId,
     });
     setPending(false);
 
@@ -173,6 +183,7 @@ export default function AdminClient({
           creatorName: effectiveName,
           isActive: true,
           description: description.trim(),
+          methodId,
         },
         ...prev,
       ];
@@ -182,6 +193,7 @@ export default function AdminClient({
     setTitle("");
     setInstitution("");
     setDescription("");
+    setMethodId("RIASEC");
   };
 
   const openReview = (s: SessionSummary) => {
@@ -423,7 +435,17 @@ export default function AdminClient({
                           {s.studentEmail ?? "Sin correo registrado"}
                         </div>
                       </div>
-                      <span className="badge">{s.cohortCode ?? "SIN COHORTE"}</span>
+                      <div className="row" style={{ gap: 6 }}>
+                        <span
+                          className="chip"
+                          data-testid="session-method-badge"
+                        >
+                          Método: {s.methodId}
+                        </span>
+                        <span className="badge">
+                          {s.cohortCode ?? "SIN COHORTE"}
+                        </span>
+                      </div>
                     </div>
 
                     <div
@@ -437,15 +459,29 @@ export default function AdminClient({
                         {s.dominantCode || "—"}
                       </span>
                       <div style={{ flex: 1, minWidth: 200 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>
-                          Carrera Top: {s.topCareerTitle ?? "Ver informe"}
-                        </div>
-                        <div className="muted" style={{ fontSize: 11 }}>
-                          Puntajes: R={Math.round(s.scores.r)}% I=
-                          {Math.round(s.scores.i)}% A={Math.round(s.scores.a)}% S=
-                          {Math.round(s.scores.s)}% E={Math.round(s.scores.e)}% C=
-                          {Math.round(s.scores.c)}%
-                        </div>
+                        {s.methodId === "RIASEC" ? (
+                          <>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>
+                              Carrera Top: {s.topCareerTitle ?? "Ver informe"}
+                            </div>
+                            <div className="muted" style={{ fontSize: 11 }}>
+                              Puntajes: R={Math.round(s.scores.r)}% I=
+                              {Math.round(s.scores.i)}% A={Math.round(s.scores.a)}% S=
+                              {Math.round(s.scores.s)}% E={Math.round(s.scores.e)}% C=
+                              {Math.round(s.scores.c)}%
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>
+                              Áreas dominantes: {s.dominantCode || "—"}
+                            </div>
+                            <div className="muted" style={{ fontSize: 11 }}>
+                              Test {s.methodId}: consulta el diagnóstico para ver
+                              los puntajes por dimensión.
+                            </div>
+                          </>
+                        )}
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <span
@@ -562,6 +598,27 @@ export default function AdminClient({
                   </div>
                 </div>
                 <div>
+                  <label className="label" htmlFor="cohort-method">
+                    Método de evaluación asignado
+                  </label>
+                  <select
+                    id="cohort-method"
+                    className="select"
+                    data-testid="cohort-method-select"
+                    value={methodId}
+                    onChange={(e) => setMethodId(e.target.value as MethodId)}
+                  >
+                    {METHOD_OPTIONS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="muted" style={{ margin: "6px 0 0", fontSize: 12 }}>
+                    El código QR del grupo llevará directamente a este test.
+                  </p>
+                </div>
+                <div>
                   <label className="label" htmlFor="cohort-description">
                     Descripción u observaciones (opcional)
                   </label>
@@ -624,6 +681,13 @@ export default function AdminClient({
                       <div className="muted" style={{ fontSize: 13 }}>
                         {c.institution || "Sin institución"}
                       </div>
+                      <span
+                        className="chip"
+                        data-testid="cohort-method-badge"
+                        style={{ marginTop: 6, display: "inline-block" }}
+                      >
+                        Método: {c.methodId ?? "RIASEC"}
+                      </span>
                     </div>
                   </div>
                   <div className="center" style={{ marginTop: 12 }}>

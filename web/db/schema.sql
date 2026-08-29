@@ -37,8 +37,22 @@ CREATE TABLE IF NOT EXISTS assessment_sessions (
     student_name        TEXT,
     student_email       TEXT,
     reviewer_notes      TEXT,
-    review_status       TEXT DEFAULT 'PENDING'
+    review_status       TEXT DEFAULT 'PENDING',
+    -- Método vocacional usado en la sesión (RIASEC por defecto). Para métodos
+    -- distintos de RIASEC, las columnas r/i/a/s/e/c quedan en 0 y los puntajes
+    -- reales por dimensión se guardan en method_scores (JSON).
+    method_id           TEXT NOT NULL DEFAULT 'RIASEC',
+    method_scores       JSONB
 );
+
+-- Migraciones idempotentes para bases ya existentes: añaden las columnas de
+-- método sin reescribir ni eliminar columnas previas. Las filas antiguas
+-- quedan con method_id = 'RIASEC' por el DEFAULT, de modo que siguen siendo
+-- válidas y la vista de resultados las trata como RIASEC.
+ALTER TABLE assessment_sessions
+    ADD COLUMN IF NOT EXISTS method_id TEXT NOT NULL DEFAULT 'RIASEC';
+ALTER TABLE assessment_sessions
+    ADD COLUMN IF NOT EXISTS method_scores JSONB;
 
 -- ---------------------------------------------------------------------------
 -- Respuestas individuales (assessment_responses)
@@ -86,8 +100,14 @@ CREATE TABLE IF NOT EXISTS cohort_groups (
     creator_name TEXT NOT NULL,
     created_at   BIGINT NOT NULL,
     is_active    BOOLEAN DEFAULT TRUE,
-    description  TEXT DEFAULT ''
+    description  TEXT DEFAULT '',
+    -- Método vocacional asignado al grupo: el QR /g/{code} lleva a este test.
+    method_id    TEXT NOT NULL DEFAULT 'RIASEC'
 );
+
+-- Migración idempotente para bases existentes.
+ALTER TABLE cohort_groups
+    ADD COLUMN IF NOT EXISTS method_id TEXT NOT NULL DEFAULT 'RIASEC';
 
 -- ---------------------------------------------------------------------------
 -- Usuarios de la aplicación (app_users)

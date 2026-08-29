@@ -72,6 +72,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: readAuth.error }, { status: 403 });
   }
 
+  // El informe de IA basado en carreras y prompt RIASEC solo aplica a sesiones
+  // RIASEC. Para métodos genéricos (CHASIDE, TIPOV) devolvemos un resumen a
+  // partir de su interpretación sin invocar el emparejamiento de carreras
+  // RIASEC (evita puntajes r/i/a/s/e/c = 0 sin sentido y no rompe la vista).
+  if (session.methodId !== "RIASEC") {
+    const generic =
+      session.methodScores?.interpretation?.trim() ||
+      session.dominantSummary ||
+      "Aún no hay un informe automatizado disponible para este método.";
+    return NextResponse.json({
+      analysis: generic,
+      source: "fallback",
+      grounded: false,
+    });
+  }
+
   const careerMatches = matchCareers(session.scores, CAREERS);
 
   const config = await resolveAiConfig();

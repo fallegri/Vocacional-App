@@ -3,6 +3,7 @@
 import { query } from "@/lib/db";
 import { DEFAULT_COHORTS } from "@/data/seed";
 import { authorizeStaffWithRoles } from "@/lib/auth/staff";
+import { normalizeMethodId } from "@/lib/methods/registry";
 import type { CohortGroup } from "@/lib/riasec/types";
 
 export interface CreateCohortResult {
@@ -23,7 +24,7 @@ export async function listCohorts(): Promise<CohortGroup[]> {
   let dbCohorts: CohortGroup[] = [];
   try {
     const rows = await query(
-      `SELECT code, title, institution, creator_name, is_active, description
+      `SELECT code, title, institution, creator_name, is_active, description, method_id
          FROM cohort_groups
         ORDER BY created_at DESC`
     );
@@ -34,6 +35,7 @@ export async function listCohorts(): Promise<CohortGroup[]> {
       creatorName: String(row.creator_name ?? ""),
       isActive: row.is_active == null ? true : Boolean(row.is_active),
       description: String(row.description ?? ""),
+      methodId: normalizeMethodId(row.method_id),
     }));
   } catch {
     // Sin DB activa: solo devolvemos las cohortes semilla.
@@ -58,6 +60,8 @@ export async function createCohort(input: {
   institution: string;
   creatorName: string;
   description?: string;
+  /** Método vocacional asignado al grupo (RIASEC por defecto). */
+  methodId?: string | null;
   /** Token de personal heredado; solo se usa como fallback si no hay OAuth. */
   staffToken?: string | null;
 }): Promise<CreateCohortResult> {
@@ -76,6 +80,7 @@ export async function createCohort(input: {
   const institution = (input.institution ?? "").trim();
   const creatorName = (input.creatorName ?? "").trim() || "Personal OrientApp";
   const description = (input.description ?? "").trim();
+  const methodId = normalizeMethodId(input.methodId);
 
   if (!code || !title) {
     return { ok: false, error: "El código y el nombre del grupo son obligatorios." };
@@ -92,9 +97,9 @@ export async function createCohort(input: {
 
     await query(
       `INSERT INTO cohort_groups (
-          code, title, institution, creator_name, created_at, is_active, description
-       ) VALUES ($1, $2, $3, $4, $5, TRUE, $6)`,
-      [code, title, institution, creatorName, Date.now(), description]
+          code, title, institution, creator_name, created_at, is_active, description, method_id
+       ) VALUES ($1, $2, $3, $4, $5, TRUE, $6, $7)`,
+      [code, title, institution, creatorName, Date.now(), description, methodId]
     );
 
     return { ok: true, code };

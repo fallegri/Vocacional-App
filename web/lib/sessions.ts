@@ -5,12 +5,26 @@
 // ===========================================================================
 
 import { query, withTransaction } from "@/lib/db";
+import { normalizeMethodId } from "@/lib/methods/registry";
+import type { MethodId, MethodResult } from "@/lib/methods/types";
 import type {
   AssessmentAnswer,
   CareerMatch,
   PsychometricScores,
   QualityMetric,
 } from "@/lib/riasec/types";
+
+/**
+ * Puntajes genéricos por método (para métodos distintos de RIASEC) que se
+ * serializan en la columna JSON method_scores. Guardamos las dimensiones, los
+ * códigos dominantes y la interpretación para poder renderizar los resultados
+ * sin depender de las columnas r/i/a/s/e/c.
+ */
+export interface StoredMethodScores {
+  dimensionScores: MethodResult["dimensionScores"];
+  dominantCodes: string[];
+  interpretation: string;
+}
 
 export interface StoredSession {
   id: string;
@@ -29,6 +43,10 @@ export interface StoredSession {
   studentName: string | null;
   studentEmail: string | null;
   reviewStatus: string | null;
+  /** Método vocacional usado (RIASEC por defecto para filas antiguas). */
+  methodId: MethodId;
+  /** Puntajes genéricos por dimensión para métodos distintos de RIASEC. */
+  methodScores: StoredMethodScores | null;
 }
 
 export interface PersistSessionInput {
@@ -44,6 +62,10 @@ export interface PersistSessionInput {
   cohortCode?: string | null;
   studentName?: string | null;
   studentEmail?: string | null;
+  /** Método vocacional usado (RIASEC por defecto). */
+  methodId?: MethodId;
+  /** Puntajes genéricos por dimensión para métodos distintos de RIASEC. */
+  methodScores?: StoredMethodScores | null;
 }
 
 /**
@@ -72,13 +94,15 @@ export async function persistSession(input: PersistSessionInput): Promise<void> 
           r_score, i_score, a_score, s_score, e_score, c_score,
           dominant_code, dominant_summary, warning_message,
           top_career_title, top_career_affinity,
-          cohort_code, student_name, student_email, review_status
+          cohort_code, student_name, student_email, review_status,
+          method_id, method_scores
        ) VALUES (
           $1, $2, $3, $4, $5,
           $6, $7, $8, $9, $10, $11,
           $12, $13, $14,
           $15, $16,
-          $17, $18, $19, $20
+          $17, $18, $19, $20,
+          $21, $22
        )
        ON CONFLICT (id) DO NOTHING`,
       [
@@ -102,6 +126,8 @@ export async function persistSession(input: PersistSessionInput): Promise<void> 
         input.studentName ?? null,
         input.studentEmail ?? null,
         "PENDING",
+        input.methodId ?? "RIASEC",
+        input.methodScores ? JSON.stringify(input.methodScores) : null,
       ]
     );
 
@@ -123,6 +149,36 @@ export async function persistSession(input: PersistSessionInput): Promise<void> 
   });
 }
 
+/**
+ * Interpreta el valor de la columna method_scores (JSONB) de forma defensiva.
+ * El controlador puede devolver un objeto ya parseado o una cadena JSON; ante
+ * cualquier error o valor ausente devuelve null.
+ */
+function parseMethodScores(value: unknown): StoredMethodScores | null {
+  if (value == null) return null;
+  let obj: unknown = value;
+  if (typeof value === "string") {
+    try {
+      obj = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof obj !== "object" || obj === null) return null;
+  const candidate = obj as Partial<StoredMethodScores>;
+  if (!Array.isArray(candidate.dimensionScores)) return null;
+  return {
+    dimensionScores: candidate.dimensionScores,
+    dominantCodes: Array.isArray(candidate.dominantCodes)
+      ? candidate.dominantCodes
+      : [],
+    interpretation:
+      typeof candidate.interpretation === "string"
+        ? candidate.interpretation
+        : "",
+  };
+}
+
 export interface SessionSummary {
   id: string;
   startedAt: number;
@@ -137,6 +193,8 @@ export interface SessionSummary {
   studentEmail: string | null;
   reviewerNotes: string | null;
   reviewStatus: string | null;
+  /** Método vocacional usado (RIASEC por defecto para filas antiguas). */
+  methodId: MethodId;
 }
 
 /**
@@ -152,7 +210,7 @@ export async function listSessions(): Promise<SessionSummary[]> {
               r_score, i_score, a_score, s_score, e_score, c_score,
               dominant_code, top_career_title,
               cohort_code, student_name, student_email,
-              reviewer_notes, review_status
+              reviewer_notes, review_status, method_id
          FROM assessment_sessions
         ORDER BY COALESCE(completed_at, started_at) DESC
         LIMIT 500`
@@ -185,6 +243,7 @@ export async function listSessions(): Promise<SessionSummary[]> {
     studentEmail: str(row.student_email),
     reviewerNotes: str(row.reviewer_notes),
     reviewStatus: str(row.review_status),
+    methodId: normalizeMethodId(row.method_id),
   }));
 }
 
@@ -216,7 +275,8 @@ export async function loadSession(
             r_score, i_score, a_score, s_score, e_score, c_score,
             dominant_code, dominant_summary, warning_message,
             top_career_title, top_career_affinity, ai_analysis,
-            cohort_code, student_name, student_email, review_status
+            cohort_code, student_name, student_email, review_status,
+            method_id, method_scores
        FROM assessment_sessions
       WHERE id = $1
       LIMIT 1`,
@@ -255,5 +315,7 @@ export async function loadSession(
     studentName: str(row.student_name),
     studentEmail: str(row.student_email),
     reviewStatus: str(row.review_status),
+    methodId: normalizeMethodId(row.method_id),
+    methodScores: parseMethodScores(row.method_scores),
   };
 }

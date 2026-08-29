@@ -31,6 +31,56 @@ aplicación **Next.js 15 (App Router) + TypeScript**, desplegable en **Vercel** 
   cohorte), gestión de cohortes con su QR, dictamen del revisor y directorio de
   usuarios.
 
+## Métodos vocacionales seleccionables
+
+La app soporta **varios instrumentos vocacionales** detrás de un **registro de
+métodos** común (`web/lib/methods/`). **RIASEC** sigue siendo el método **por
+defecto** y su comportamiento, puntajes y vista de resultados no cambian.
+
+| Método     | Ítems | Escala de respuesta                                      | Puntuación                                                                                   | Interpretación                                                                 |
+| ---------- | :---: | -------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| **RIASEC** |  60   | Likert-5 (1 = Nada … 5 = Mucho)                          | Puntaje 0–100 por dimensión (R, I, A, S, E, C); calidad por pares espejo/tiempos.            | Código dominante + radar + emparejamiento de 16 carreras + informe IA.         |
+| **CHASIDE**|  98   | Dicotómica: **Sí** (1) / **No** (0)                      | Conteo de "Sí" por área (7 áreas C, H, A, S, I, D, E), separando **Interés** (máx. 10) y **Aptitud** (máx. 4). | Dos áreas de mayor interés + alineación **Interés-vs-Aptitud**.                |
+| **TIPOV**  |  66   | Likert-3: **Me agrada** (3) / **Me es indiferente** (2) / **Me desagrada** (1) | Suma cruda por dimensión (13 dimensiones de interés) y valor normalizado 0–100.              | Dimensiones de interés dominantes.                                             |
+
+> Los bancos de ítems de CHASIDE y TIPOV son **adaptaciones originales y fieles**
+> a la estructura y puntuación descritas en la documentación de cada método (los
+> documentos aportan la estructura/calificación, no la redacción textual).
+
+### Cómo se elige el método
+
+- **Por el usuario**, al iniciar la evaluación: en `/assessment` hay un selector
+  de método (RIASEC por defecto). El cuestionario se renderiza dinámicamente con
+  los ítems y la **escala de respuesta** del método elegido (Likert-5, Likert-3
+  o Sí/No).
+- **Por el grupo/cohorte**, cuando el personal **asigna un método** al crear la
+  cohorte. El código QR (`/g/{CODIGO}`) redirige a
+  `/assessment?cohort=CODIGO&method=METODO`, de modo que el enlace lleva directo
+  al test asignado a ese grupo. Cuando la cohorte fija un método, el selector
+  aparece **bloqueado** con una nota en español. Si el método asignado es RIASEC
+  (por defecto), la URL **omite** el parámetro `method` para mantener los enlaces
+  idénticos a los previos.
+
+### Persistencia y resultados por método
+
+- `assessment_sessions` guarda `method_id` (**RIASEC** por defecto para filas
+  antiguas) y `method_scores` (**JSONB** con los puntajes por dimensión, los
+  códigos dominantes y la interpretación). Para RIASEC se siguen escribiendo las
+  columnas `r/i/a/s/e/c`, `dominant_code` y `dominant_summary` como siempre; para
+  CHASIDE/TIPOV esas columnas quedan en `0` y los puntajes reales viven en
+  `method_scores`.
+- `cohort_groups` guarda `method_id` (el método asignado al grupo).
+- Ambas columnas se agregan con migraciones **idempotentes**
+  (`ADD COLUMN IF NOT EXISTS`), por lo que aplicar el esquema es seguro sobre
+  bases existentes.
+- La **vista de resultados** (`/results/{id}`) ramifica por `method_id`: RIASEC
+  conserva el radar + 6 barras + ranking de carreras + informe IA; CHASIDE y
+  TIPOV muestran una vista genérica en español (barras por dimensión, áreas
+  dominantes e interpretación; CHASIDE incluye la comparación
+  **Interés-vs-Aptitud**). La **autorización de lectura por propiedad de sesión**
+  se aplica igual para todos los métodos (un estudiante solo ve sus propias
+  sesiones, sea cual sea el método).
+
 ## Autenticación y autorización (importante)
 
 La app usa **Google OAuth** mediante **Auth.js / NextAuth v5** como inicio de
