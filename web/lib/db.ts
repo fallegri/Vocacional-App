@@ -1,4 +1,4 @@
-import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
+import { neon, Pool, type NeonQueryFunction } from "@neondatabase/serverless";
 
 /**
  * Cliente Neon inicializado de forma perezosa (lazy).
@@ -38,15 +38,38 @@ export function sql(
 }
 
 /**
+ * Pool perezoso para consultas parametrizadas con texto SQL explícito.
+ *
+ * La función HTTP que devuelve `neon()` no expone un método `.query(text,
+ * params)`, por lo que las consultas parametrizadas se ejecutan a través de un
+ * `Pool` (compatible con node-postgres). El Pool también se crea de forma
+ * perezosa: `process.env.DATABASE_URL` solo se lee en la primera consulta.
+ */
+let cachedPool: Pool | null = null;
+
+function getPool(): Pool {
+  if (cachedPool) return cachedPool;
+
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error(
+      "DATABASE_URL no está definida. Configura la cadena de conexión de Neon Postgres en tu entorno (por ejemplo en .env.local) antes de ejecutar consultas."
+    );
+  }
+
+  cachedPool = new Pool({ connectionString });
+  return cachedPool;
+}
+
+/**
  * Helper para consultas parametrizadas con texto SQL explícito. Uso:
  *   const rows = await query("SELECT * FROM app_users WHERE id = $1", [id]);
  */
-export function query(
+export async function query(
   text: string,
   params: unknown[] = []
 ): Promise<Record<string, unknown>[]> {
-  const client = getClient() as unknown as {
-    query: (text: string, params?: unknown[]) => Promise<Record<string, unknown>[]>;
-  };
-  return client.query(text, params);
+  const pool = getPool();
+  const result = await pool.query(text, params);
+  return result.rows as Record<string, unknown>[];
 }
