@@ -1,0 +1,23 @@
+{
+  "id": "FEAT-004",
+  "type": "docs",
+  "description": "Document the selectable-method feature in web/README.md (Spanish): the available vocational methods, how a user chooses one, how staff assign a method to a cohort (and how the QR flow carries it), per-method scale + scoring + interpretation, and the schema/persistence changes. Also document which uploaded methods were implemented as fully interactive instruments vs. left as reference-only knowledge-base material and why.",
+  "status": "pending",
+  "steps": [
+    "Read the current web/README.md to match its Spanish style and section structure.",
+    "Add a Spanish section 'Métodos de evaluación seleccionables' documenting: (1) RIASEC/Holland (default) — Likert 1-5, 60 ítems, puntaje por dimensión, radar + afinidad de carreras; (2) CHASIDE — dicotómico Sí/No, 98 ítems (70 interés + 28 aptitud) sobre 7 áreas C,H,A,S,I,D,E, puntaje por conteo de 'Sí' con selección de las dos áreas más altas por dimensión (interés y aptitud), y aclaración de que el banco de ítems es una adaptación fiel original (el documento define estructura y calificación, no el enunciado textual); (3) TIPOV — Likert-3 (Me agrada/indiferente/desagrada = 3/2/1), 66 ítems sobre 13 dimensiones, puntaje por suma por dimensión, con la misma aclaración sobre el banco de ítems.",
+    "Document how the user chooses a method at the start of the assessment and how staff assign a method to a cohort at creation so the QR (/g/{code}) leads to the assigned test.",
+    "Document the schema/persistence change: assessment_sessions.method_id (default RIASEC) + method_scores (JSONB); cohort_groups.method_id; note migrations are idempotent (ADD COLUMN IF NOT EXISTS) and old rows default to RIASEC; note the no-env build invariant is preserved.",
+    "Add a short Spanish subsection explaining which uploaded docs became interactive instruments (RIASEC ya existente, CHASIDE, TIPOV) and which remain reference/knowledge-base material and why (CIP-R y Magdalena Contreras: implementables pero no incluidos en esta etapa; Instrumento de Autoorientación, enfoque adleriano de Bernstein, y Strong/Kuder: marcos teóricos o compuestos, no cuestionarios autoaplicados de un solo puntaje, por lo que se tratan como material de referencia). Note doc-ingestion into the RAG knowledge base as a documented follow-up."
+  ],
+  "acceptance_criteria": [
+    "web/README.md has a Spanish section describing the selectable methods, per-method scale/scoring/interpretation, user choice, cohort assignment + QR flow, and the schema/persistence change",
+    "README states which methods are interactive vs. reference-only and why, and notes RAG ingestion as a follow-up",
+    "No code behavior changes in this feature; `npm run build` still succeeds with no env vars"
+  ],
+  "verification": [
+    "cd web && npm run build"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-001",
+  "type": "chore",
+  "description": "Establish a green baseline before any changes. Install deps and run the project's four verification commands from web/ to confirm the current state (RIASEC-only) builds, typechecks, lints, and passes all existing Vitest tests with no env vars set.",
+  "status": "completed",
+  "steps": [
+    "From web/: run `npm install` (node_modules is already present; this confirms the lockfile resolves).",
+    "Run `npm run typecheck` and confirm it passes.",
+    "Run `npm run lint` and confirm it passes.",
+    "Run `npm run test -- --run` and record the passing test count (expected ~81 tests across 7 files).",
+    "Run `npm run build` and confirm it succeeds with NO environment variables set (this is a hard invariant to preserve throughout the task).",
+    "Record the baseline results in this feature's findings field."
+  ],
+  "acceptance_criteria": [
+    "`npm run typecheck` exits 0",
+    "`npm run lint` exits 0",
+    "`npm run test -- --run` passes all tests and the count is recorded",
+    "`npm run build` succeeds with no env vars set"
+  ],
+  "verification": [
+    "cd web && npm run typecheck",
+    "cd web && npm run lint",
+    "cd web && npm run test -- --run",
+    "cd web && npm run build"
+  ],
+  "blocked_reason": null,
+  "findings": "Baseline verified GREEN on branch feat/web-migration-vercel-neon (RIASEC-only state). Ran all four commands from web/ with node_modules already present.\n- `npm install`: exit 0, lockfile resolves (npm audit warnings only, no errors).\n- `npm run typecheck` (tsc --noEmit): exit 0, no type errors.\n- `npm run lint` (next lint): exit 0, 'No ESLint warnings or errors'. Note: next lint prints a deprecation notice (removed in Next.js 16) but still passes.\n- `npm run test -- --run` (Vitest 3.2.7): exit 0. 81 tests PASSED across 7 files: qr.test.ts (8), ai-client.test.ts (4), engine.test.ts (20), knowledge.test.ts (11), read-access.test.ts (6), auth-roles.test.ts (25), read-access-routes.test.ts (7). Total = 81. RIASEC engine.test.ts (20) green and unchanged.\n- `npm run build`: exit 0 with NO env vars set (ran via `env -i` to enforce). Hard invariant confirmed: build succeeds without DATABASE_URL or any env vars; static pages generated (7/7); no import-time DB/network calls. 16 routes built.\nNo application code changed. Baseline is green and safe to build on."
+}

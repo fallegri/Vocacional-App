@@ -1,0 +1,33 @@
+{
+  "project_type": "Next.js 15 (App Router) web app 'OrientApp' under web/ — vocational-diagnostic app migrated from native Android. Vercel + Neon Postgres + pgvector. Auth.js v5 (next-auth@beta) with roles STUDENT/REPORT_REVIEWER/TEST_ADMIN/SUPER_ADMIN.",
+  "language": "TypeScript (React 19, Node 22)",
+  "build_system": "npm. Scripts in web/package.json: dev, build (next build), start, lint (next lint), typecheck (tsc --noEmit), test (vitest), db:seed (tsx scripts/seed.ts).",
+  "test_framework": "Vitest 3. Test files in web/tests/*.test.ts (currently 7 files, 81 tests). Path alias '@/...' -> web root (see vitest.config.ts + tsconfig.json).",
+  "build_command": "cd web && npm run build",
+  "test_command": "cd web && npm run test -- --run",
+  "verification_instructions": "From web/: run all four and confirm each passes: `npm run typecheck`, `npm run lint`, `npm run test -- --run` (expect >=81 tests, RIASEC engine.test.ts unchanged and green), `npm run build`. CRITICAL INVARIANT: `npm run build` MUST succeed with NO env vars set. Auth/DB config is read lazily/at request time; no DB or network call may run at import time or during build. New API routes must set `export const dynamic = 'force-dynamic'` and `export const runtime = 'nodejs'` like web/app/api/sessions/route.ts.",
+  "snapshot_or_generated_files": "None. tsconfig.tsbuildinfo and .next/ are build artifacts (gitignored/regenerated).",
+  "setup_instructions": "cd web && npm install (node_modules already present). No env vars needed for build/typecheck/lint/test.",
+  "environment_constraints": "Network mode OPEN_INTERNET. Node 22 + npm available. DB (Neon) not available in sandbox — sessions.ts/db.ts already swallow DB errors and return []/null so build+tests pass without DATABASE_URL. Do NOT introduce import-time DB/network calls. Original Android sources under app/ MUST stay untouched. Work on branch feat/web-migration-vercel-neon; commit onto it; DO NOT push or create PRs.",
+  "contribution_requirements": "All user-facing text in SPANISH. Keep role-based authorization intact (students only see their own sessions regardless of method). RIASEC must remain the DEFAULT method and its behavior + tests unchanged. Update web/README.md (Spanish) describing available methods, how to choose one, per-method scale/scoring/interpretation, and schema changes. Each new scoring engine needs real (non-stub) Vitest tests.",
+  "key_patterns": "Pure scoring functions in web/lib/riasec/engine.ts (calculateScores, evaluateQuality, matchCareers, getDominantCode, getDominantProfileDescription). Domain types in web/lib/riasec/types.ts. Seed item bank + careers in web/data/seed.ts (60 RIASEC questions w/ mirror pairs, 16 careers). Persistence in web/lib/sessions.ts using lazy query()/withTransaction() from web/lib/db.ts. Schema in web/db/schema.sql (idempotent CREATE TABLE IF NOT EXISTS; migrations must use IF NOT EXISTS / ADD COLUMN IF NOT EXISTS). API create-session at web/app/api/sessions/route.ts (validates answers against seed catalog, computes scores, persists, returns {id}). Assessment UI: web/app/assessment/page.tsx -> web/components/AssessmentClient.tsx (Likert 1-5, auto-advance, mirror timing). Cohort QR shortcut: web/app/g/[code]/page.tsx redirects to /assessment?cohort=CODE. Results at web/app/results/[sessionId]/page.tsx (radar + 6 dimension bars + career ranking + AI report). Cohort creation server action: web/lib/actions/cohorts.ts. Admin UI: web/components/AdminClient.tsx.",
+  "relevant_files": [
+    "web/lib/riasec/engine.ts (RIASEC scoring — DO NOT change behavior)",
+    "web/lib/riasec/types.ts (domain types)",
+    "web/data/seed.ts (RIASEC 60 items + 16 careers)",
+    "web/lib/sessions.ts (persistence)",
+    "web/db/schema.sql (Neon schema)",
+    "web/app/api/sessions/route.ts (create-session API)",
+    "web/components/AssessmentClient.tsx (assessment UI)",
+    "web/app/assessment/page.tsx",
+    "web/app/g/[code]/page.tsx (cohort QR shortcut)",
+    "web/app/results/[sessionId]/page.tsx (results view)",
+    "web/lib/actions/cohorts.ts (cohort creation)",
+    "web/components/AdminClient.tsx (admin/cohort UI)",
+    "web/tests/engine.test.ts (RIASEC tests — must stay green unchanged)",
+    "skills/knowledge/metodo-chaside.md (CHASIDE spec)",
+    "skills/knowledge/test-tipov.md (TIPOV spec)",
+    "web/README.md"
+  ],
+  "directory_structure": "web/app (App Router pages + api routes), web/components (client components), web/lib (riasec engine/types, auth, ai, knowledge, db, sessions, actions), web/data/seed.ts, web/db/schema.sql, web/tests (vitest), skills/knowledge/*.md (uploaded method docs, already merged)."
+}

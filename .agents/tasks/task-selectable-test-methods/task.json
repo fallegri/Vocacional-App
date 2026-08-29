@@ -1,0 +1,7 @@
+{
+  "task_id": "task-selectable-test-methods",
+  "task_description": "Let the user choose which vocational-test method to take: the app's existing RIASEC method (default) or a method from the uploaded docs. Introduce a pluggable method registry, implement CHASIDE and TIPOV as new fully-interactive self-scored instruments (with faithful item banks and correct scale/scoring/interpretation), keep RIASEC unchanged, persist which method a session used, support per-user choice and per-cohort assignment (QR carries the method), and document everything in Spanish. All work on branch feat/web-migration-vercel-neon; do not push.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
+  "blocked_reason": null
+}
