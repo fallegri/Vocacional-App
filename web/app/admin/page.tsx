@@ -14,6 +14,14 @@ export default function AdminPage() {
           vocacional asignado a cada grupo. Cada QR abre la evaluación con el
           código de cohorte ya aplicado.
         </p>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+          <a className="btn btn-secondary" href="/admin/knowledge">
+            Base de Conocimiento (RAG)
+          </a>
+          <a className="btn btn-secondary" href="/admin/ai-settings">
+            Ajustes de IA
+          </a>
+        </div>
       </div>
       <AdminClient />
     </main>

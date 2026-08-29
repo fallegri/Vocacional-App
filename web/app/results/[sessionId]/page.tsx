@@ -1,5 +1,6 @@
 import Link from "next/link";
 import RadarChart from "@/components/RadarChart";
+import AiReportClient from "@/components/AiReportClient";
 import { loadSession } from "@/lib/sessions";
 import { matchCareers } from "@/lib/riasec/engine";
 import { CAREERS } from "@/data/seed";
@@ -153,6 +154,19 @@ export default async function ResultsPage({
       <div className="card" style={{ marginTop: 16 }}>
         <h2 style={{ marginTop: 0 }}>Perfil dominante</h2>
         <p style={{ marginBottom: 0 }}>{session.dominantSummary}</p>
+      </div>
+
+      {/* Informe del Asesor IA (bajo demanda, fundamentado en la base de conocimiento) */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <AiReportClient sessionId={session.id} initialAnalysis={session.aiAnalysis} />
+        <div className="center" style={{ marginTop: 16 }}>
+          <Link
+            href={`/tutor?session=${encodeURIComponent(session.id)}`}
+            className="btn btn-secondary"
+          >
+            Conversar con el Tutor IA
+          </Link>
+        </div>
       </div>
 
       {/* Ranking de carreras */}
