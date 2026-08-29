@@ -1,0 +1,31 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Port the OpenAI-compatible AI advisor to the web (server-side) and ADD a RAG knowledge base grounded in staff-uploaded documents (books, scientific research, etc.) using Neon pgvector. Includes: an AI client + config, the vocational diagnostic report generator and conversational tutor (both server-side so API keys never reach the browser), a knowledge-base ingestion pipeline (chunk + embed documents into knowledge_chunks with pgvector), a retrieval step that injects the most relevant passages as grounding context with citations into the advisor prompts, and a staff admin UI to upload/list knowledge documents. Depends on FEAT-001; complements FEAT-002.",
+  "steps": [
+    "Create web/lib/ai/client.ts: a server-side OpenAI-compatible chat client faithful to app/src/main/java/com/example/data/remote/AiService.kt (dynamic base_url normalization to /v1/chat/completions, Authorization: Bearer <key> when key present, temperature/max_tokens, parse choices[0].message.content, Spanish error handling). Also add an embeddings function (POST {baseUrl}/embeddings) returning number[] vectors. Read provider config from env (e.g. AI_BASE_URL, AI_API_KEY, AI_MODEL, AI_EMBEDDING_MODEL) and/or the ai_config table; never expose keys to the client. Port AiProviderType metadata from AiModels.kt.",
+    "Port the two system prompts from AiService.kt into web/lib/ai/prompts.ts: generateVocationalReport (4-section Spanish report using scores, dominantCode, topCareers, reliabilityLevel, optional studentName) and the conversational tutor prompt that carries the student's psychometric context. Keep Spanish wording faithful. Also port buildOfflineFallbackAnalysis as a no-AI fallback.",
+    "Add server route handlers: web/app/api/ai/report/route.ts (generate diagnostic report for a session; persist to assessment_sessions.ai_analysis) and web/app/api/ai/chat/route.ts (conversational tutor; accepts conversation history + current diagnostic context). These run server-side only.",
+    "Implement the knowledge base ingestion in web/lib/knowledge/ingest.ts: accept a document (title, source_type e.g. 'book'|'research'|'article', optional source_reference like citation/URL, and text content), insert a knowledge_documents row, split content into overlapping text chunks, compute embeddings via the embeddings function, and insert knowledge_chunks rows with the vector(1536) embedding. If no AI key is configured, allow storing chunks with null embeddings and document that retrieval requires embeddings.",
+    "Implement retrieval in web/lib/knowledge/retrieve.ts: given a query string, embed it and run a pgvector cosine-similarity search (ORDER BY embedding <=> $queryEmbedding LIMIT k) over knowledge_chunks, returning top-k chunks with their parent document title/source_reference for citation. Guard for the case where DATABASE_URL/embeddings are unavailable.",
+    "Wire retrieval into the advisor: before calling the tutor and report prompts, retrieve relevant passages for the user's question / profile and inject them into the system/user prompt as a clearly delimited 'Fuentes de conocimiento' context block, instructing the model to ground answers in and cite these sources (title + reference). When no sources are found or embeddings are unavailable, fall back to the normal prompt.",
+    "Add a staff-only knowledge-base admin route web/app/admin/knowledge/page.tsx with an upload form (title, source type, reference, pasted text or file upload) posting to web/app/api/knowledge/route.ts which calls ingest; and a list of existing documents with chunk counts. Keep UI Spanish.",
+    "Add an AI settings UI (web/app/admin/ai-settings or a dialog) equivalent to AiSettingsDialog.kt to configure provider/baseUrl/apiKey/model/temperature, persisted to ai_config; and a student tutor chat UI (web/app/tutor or component) equivalent to AiChatScreen.kt that calls /api/ai/chat.",
+    "Ensure build/typecheck pass without AI keys or DB (all AI/embedding/db calls lazy and guarded)."
+  ],
+  "acceptance_criteria": [
+    "AI client, report generator, and tutor run server-side; no API key is referenced in client bundles.",
+    "web/lib/knowledge/ingest.ts inserts a knowledge_documents row and multiple knowledge_chunks rows, embedding each chunk when an AI key is configured.",
+    "web/lib/knowledge/retrieve.ts performs a pgvector cosine similarity query and returns top-k chunks with document title + source reference for citation.",
+    "The advisor prompt injects retrieved passages as a grounding/citation context block when sources exist.",
+    "A staff knowledge-base admin page allows uploading a document and lists stored documents.",
+    "`cd web && npm run build` and `npm run typecheck` pass without AI/DB env vars set."
+  ],
+  "verification": [
+    "cd web && npm run typecheck",
+    "cd web && npm run build",
+    "cd web && npm run test -- --run"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -1,0 +1,7 @@
+{
+  "task_id": "task-orientapp-web-migration",
+  "task_description": "Migrate the OrientApp native Android (Kotlin/Compose/Room) vocational-diagnostic app to a Next.js + TypeScript web app deployed on Vercel + Neon Postgres. Faithfully port the RIASEC psychometric engine, 60-question assessment, radar results, career matching, and OpenAI-compatible AI advisor. Add (1) a RAG knowledge base grounded in staff-uploaded documents (books/research) using Neon pgvector with citations, and (2) automatic QR-code generation when a new survey group (cohort) is created, linking to the cohort-scoped test form. Original Android sources under app/ are preserved; the web app lives under web/.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"],
+  "blocked_reason": null
+}

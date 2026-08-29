@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Build the student-facing assessment experience as web pages/routes: home/landing, the 60-question RIASEC Likert assessment with per-item response-time capture, cohort scoping via URL (?cohort=CODE or /g/{code}), a results screen with an interactive hexagonal RIASEC radar chart (SVG/Canvas port of RadarChart.kt), career-match ranking, and a careers explorer with detail view. Persist completed sessions and responses to Neon via server actions/route handlers. Depends on FEAT-001 (engine, types, seed, db).",
+  "status": "pending",
+  "steps": [
+    "Add a home/landing route (web/app/page.tsx) in Spanish describing OrientApp and starting an assessment, matching the tone of the Android HomeScreen. Include navigation to the assessment, careers explorer, and (for staff) admin.",
+    "Build the assessment route web/app/assessment/page.tsx (client component) rendering the 60 questions from seed data on a 1-5 Likert scale, one-at-a-time or paged, capturing timeSpentMs per item (timestamp when shown vs answered). Read cohort scope from the URL search param `cohort` (e.g. /assessment?cohort=ING-2026-A) and also support a /g/[code] route (web/app/g/[code]/page.tsx) that redirects/loads the assessment scoped to that cohort code. Collect optional student name/email.",
+    "On submit, compute scores/quality/careerMatches client-side or via a server action using the ported engine, then persist: create a server action or route handler web/app/api/sessions/route.ts (or web/lib/actions/*) that inserts into assessment_sessions and assessment_responses using web/lib/db.ts. Store dominantCode (getDominantCode(3)), dominantSummary (getDominantProfileDescription), reliabilityLevel, per-dimension scores, top career title/affinity, cohortCode, studentName, studentEmail. Generate a session id (uuid).",
+    "Build the results route web/app/results/[sessionId]/page.tsx showing: the hexagonal RIASEC radar chart, the 6 dimension scores with their dimension colors, the reliability level + any Spanish warning message, dominant profile description, and the ranked career matches with affinity % and matchLevel labels. Load session data from Neon by id (lazy DB).",
+    "Port the radar chart to web/components/RadarChart.tsx: a hexagonal 6-axis radar (R,I,A,S,E,C) drawn with SVG (or canvas), plotting the normalized 0-100 scores, using the per-dimension colors from types. Reference app/src/main/java/com/example/ui/components/RadarChart.kt for the visual layout (axis labels, grid rings).",
+    "Build the careers explorer route web/app/careers/page.tsx listing all 16 careers (from seed) with area, description, key skills, and future trends; and a career detail view (component or route) equivalent to CareerDetailSheet.kt. If a diagnostic session is present, show affinity for each career.",
+    "Ensure all new pages typecheck and the production build passes without a live DB (guard any DB reads so build/prerender does not require a connection; use dynamic rendering where needed)."
+  ],
+  "acceptance_criteria": [
+    "Assessment page renders all 60 questions on a 1-5 scale and records a timeSpentMs per answered item.",
+    "Visiting /assessment?cohort=ING-2026-A and /g/ING-2026-A both scope the assessment to that cohort code.",
+    "Submitting a completed assessment inserts one assessment_sessions row and 60 assessment_responses rows (verified by code path / SQL, exercised against a real Neon only at runtime).",
+    "Results page renders the hexagonal radar with 6 axes and the ranked career list with Spanish matchLevel labels.",
+    "`cd web && npm run build` and `npm run typecheck` pass without DATABASE_URL."
+  ],
+  "verification": [
+    "cd web && npm run typecheck",
+    "cd web && npm run build",
+    "cd web && npm run test -- --run"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

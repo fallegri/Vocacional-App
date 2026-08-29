@@ -1,0 +1,30 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Implement cohort/group management with QR-code generation and the staff admin dashboard. When a new survey group (cohort) is created, generate a QR code that encodes the URL to the vocational-test form scoped to that cohort (e.g. https://<host>/g/{CODE} or /assessment?cohort={CODE}) and surface it in the create-cohort flow and admin area so staff can share/print it. Also port the admin dashboard: list evaluations/sessions with cohort filtering, reviewer dictamen (notes + review status), and cohort listing. Depends on FEAT-001 (schema/seed/db) and FEAT-002 (assessment routes the QR points to).",
+  "status": "pending",
+  "steps": [
+    "Add a QR-code capability: install a QR library (e.g. `qrcode` for server-side data-URL/SVG generation, or `qrcode.react` for client rendering). Create web/lib/qr.ts (or a component) that, given a cohort code and the app base URL, builds the scoped test URL (prefer /g/{CODE}, which FEAT-002 maps to the cohort-scoped assessment) and produces a QR image (SVG or PNG data URL).",
+    "Build the cohort create flow web/app/admin/cohorts (list + create) equivalent to CohortSelectorDialog.kt/CreateCohortDialog.kt: form with fields code (uppercased, e.g. BIO-2026-C), title, institution, description. On create, insert into cohort_groups via a server action/route (web/app/api/cohorts/route.ts) with created_at, is_active=true, creator_name from the current staff user.",
+    "Immediately after a cohort is created (and on demand from the cohort list), render/display its QR code linking to the scoped test URL, with the human-readable URL shown beneath and a download/print action. Ensure the encoded URL uses a configurable base URL (env NEXT_PUBLIC_APP_URL or request origin) so it works on the deployed Vercel domain.",
+    "Build the admin dashboard web/app/admin/page.tsx porting AdminDashboardScreen.kt behavior: tabs/sections for evaluations & audit (list assessment_sessions with search by student/email/dominant code and filter by cohort, summary counts of total/valid/pending), cohort management (list cohorts + their QR + create), and users directory. Load data from Neon (lazy). Keep role-based section labels in Spanish per UserRole.",
+    "Implement reviewer dictamen: a route/action web/app/api/sessions/[id]/review/route.ts to update reviewer_notes and review_status (PENDING/IN_REVIEW/APPROVED/NEEDS_FOLLOWUP from ReviewStatus) on a session, surfaced via a review dialog/form in the dashboard (equivalent to ReviewerFeedbackDialog).",
+    "Provide a lightweight role/user selector (the Android app has no real auth; it seeds users and lets you switch role). Port an equivalent: allow selecting the acting user/role from seeded users so staff sections are reachable. Do not implement real OAuth (out of scope); document this in the README.",
+    "Ensure build/typecheck pass without a live DB."
+  ],
+  "acceptance_criteria": [
+    "Creating a cohort inserts a cohort_groups row and then displays a QR code encoding the scoped test URL (/g/{CODE} or /assessment?cohort={CODE}).",
+    "Scanning/opening the encoded URL lands on the assessment scoped to that cohort code (integrates with FEAT-002).",
+    "The QR-encoded URL uses a configurable base URL (env or request origin), not a hard-coded localhost.",
+    "Admin dashboard lists sessions with cohort filter + search and shows total/valid/pending counts.",
+    "Reviewer can save notes + a review status onto a session.",
+    "`cd web && npm run build` and `npm run typecheck` pass."
+  ],
+  "verification": [
+    "cd web && npm run typecheck",
+    "cd web && npm run build",
+    "cd web && npm run test -- --run"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

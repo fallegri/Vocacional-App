@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-005",
+  "type": "docs",
+  "description": "Add Vercel deployment configuration, Neon setup instructions, a database seeding script, and a comprehensive README so the migrated web app can be deployed to Vercel + Neon. Finalize env-var documentation (including AI/embeddings and pgvector). Depends on FEAT-001..FEAT-004.",
+  "status": "pending",
+  "steps": [
+    "Add web/README.md documenting: project overview (OrientApp web migration), local dev (npm install, npm run dev), the full list of env vars with descriptions (DATABASE_URL for Neon; AI_BASE_URL / AI_API_KEY / AI_MODEL / AI_EMBEDDING_MODEL for the OpenAI-compatible advisor + embeddings; NEXT_PUBLIC_APP_URL for QR base URL), how to provision a Neon database and enable pgvector, how to apply web/db/schema.sql, how to seed the DB, and step-by-step Vercel deploy (import repo, set root directory to web/, set env vars in Vercel project settings, deploy).",
+    "Add a DB seeding script web/scripts/seed.ts (runnable via an npm script like `npm run db:seed`) that applies web/db/schema.sql if needed and inserts the default cohorts, users, and (optionally) AI config from web/data/seed.ts into Neon using web/lib/db.ts. It must read DATABASE_URL at runtime and no-op/exit with a clear message if unset (so it never runs during build).",
+    "Add vercel.json if needed (or document that Vercel auto-detects Next.js with root directory web/). Ensure the AI/DB routes use the Node.js runtime where the Neon serverless driver or embeddings need it; document any runtime settings.",
+    "Update the repo root README (create web/ pointer or a short note in an existing doc) so a reader knows the Android app under app/ is preserved and the deployable web app is under web/. Do not delete or modify app/ sources.",
+    "Confirm web/.env.example lists every env var referenced anywhere in web/ (grep for process.env) with a placeholder and comment, and that no real secrets are committed.",
+    "Run the full verification suite and fix any remaining typecheck/lint/build issues."
+  ],
+  "acceptance_criteria": [
+    "web/README.md documents Neon provisioning + pgvector, applying schema.sql, seeding, and Vercel deploy steps (root dir web/, env vars).",
+    "web/.env.example lists every process.env var used in web/ with placeholders; no real secrets committed.",
+    "web/scripts/seed.ts exists, is wired to an npm script, and exits cleanly with a clear message when DATABASE_URL is unset.",
+    "`cd web && npm run build`, `npm run typecheck`, `npm run lint`, and `npm run test -- --run` all pass."
+  ],
+  "verification": [
+    "cd web && npm run typecheck",
+    "cd web && npm run lint",
+    "cd web && npm run test -- --run",
+    "cd web && npm run build",
+    "cd web && grep -rEo 'process\\.env\\.[A-Z_]+' app lib scripts | sort -u"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

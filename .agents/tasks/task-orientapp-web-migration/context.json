@@ -1,0 +1,27 @@
+{
+  "project_type": "Migration of a native Android app (Kotlin/Jetpack Compose/Room) to a Next.js 15 (App Router) + TypeScript web app deployed on Vercel with Neon serverless Postgres (+ pgvector for a RAG knowledge base). New web app lives under the top-level web/ directory; original Android sources under app/ are preserved.",
+  "language": "TypeScript (new web app); original app is Kotlin",
+  "build_system": "npm (Node 22). Next.js build via `next build`. TypeScript checks via `tsc --noEmit`. ESLint via `next lint`.",
+  "test_framework": "Vitest for unit tests of the ported psychometric engine (pure functions). Configure a `test` npm script.",
+  "build_command": "cd web && npm run build",
+  "test_command": "cd web && npm run test -- --run && npm run typecheck",
+  "verification_instructions": "From web/: run `npm install`, then `npm run typecheck` (tsc --noEmit), `npm run lint`, `npm run test -- --run` (Vitest engine tests), and `npm run build` (Next.js production build). The build must succeed WITHOUT a live database connection: DB access must be lazy/runtime-only, never at module top-level or during build. Use env placeholders (DATABASE_URL) documented in web/.env.example. Do NOT require live Neon/OpenAI credentials for build or unit tests.",
+  "snapshot_or_generated_files": "None checked in. Next.js .next/ build output and node_modules/ are git-ignored (add web/.gitignore). SQL migration/schema files under web/db/ ARE checked in and are the source of truth for the Neon schema (including pgvector).",
+  "setup_instructions": "Node 22 is preinstalled. In web/: `npm install`. For local DB, set DATABASE_URL to a Neon connection string in web/.env.local (not committed). pgvector is enabled on Neon via `CREATE EXTENSION IF NOT EXISTS vector;` in the schema. No local Postgres needed for build/typecheck/tests.",
+  "environment_constraints": "Network mode OPEN_INTERNET (npm installs allowed). No live Neon or OpenAI credentials are available in the sandbox, so verification is limited to install/typecheck/lint/unit-test/build. Runtime DB/AI behavior cannot be exercised here; design all DB and AI calls to be lazily initialized so the production build passes without secrets. Docker not required.",
+  "contribution_requirements": "No CONTRIBUTING.md present. Keep original Android sources intact (do not delete app/). Add the web app in web/. Provide a README with Vercel + Neon deploy steps and required env vars. Never commit real secrets; use web/.env.example placeholders.",
+  "key_patterns": "Domain logic to port faithfully from Kotlin: PsychometricEngine (6 RIASEC dimension scores on 0-100 = sum(score-1)/(4*answered)*100 clamped [0,100]; quality heuristics: speed trap avg<1100ms with >=10 timed items, straight-lining maxFreq/count>=0.75 with >=15 answers, mirror-pair consistency penalty 20 if diff>=3 / 10 if diff==2, mirrorConsistencyPercent=(100-penalty) clamped [40,100], reliability Alta/Moderada/Baja; career match = cosine*0.70 + euclideanProximity*0.30 scaled *100, euclideanProximity=1-(dist/2.45) with per-dim diff/100, +5% boost (*1.05 cap 99.5) when dominant dims match, final clamp [30,99]; getDominantProfileDescription 2-letter map; getDominantCode = top-N dimension letters concatenated). Seed content from SeedData.kt: 60 questions (10/dimension, mirror pairs 1<->7,11<->17,21<->27,31<->37,41<->47,51<->57), 16 careers with ideal vectors, 4 default cohorts, roles (SUPER_ADMIN/TEST_ADMIN/REPORT_REVIEWER/STUDENT). AI client is OpenAI-compatible (base_url + Bearer key), two system prompts (diagnostic report + conversational tutor). All UI strings are in Spanish and must remain Spanish.",
+  "relevant_files": [
+    "SDD_ORIENTAPP_V2.md (authoritative design doc, Spanish)",
+    "app/src/main/java/com/example/domain/PsychometricEngine.kt (scoring math to port)",
+    "app/src/main/java/com/example/data/repository/SeedData.kt (60 questions, 16 careers, cohorts, users)",
+    "app/src/main/java/com/example/data/model/PsychometricModels.kt (DimensionCode, Career, scores)",
+    "app/src/main/java/com/example/data/model/AiModels.kt (AiProviderType, chat DTOs)",
+    "app/src/main/java/com/example/data/model/UserModels.kt (UserRole, CohortGroup, ReviewStatus)",
+    "app/src/main/java/com/example/data/local/entities/AssessmentEntities.kt (DB schema to mirror in Postgres)",
+    "app/src/main/java/com/example/data/remote/AiService.kt (OpenAI-compatible client + prompts)",
+    "app/src/main/java/com/example/ui/screens/CohortSelectorDialog.kt (cohort create flow -> QR)",
+    "app/src/main/java/com/example/ui/screens/AdminDashboardScreen.kt (admin dashboard reference)"
+  ],
+  "directory_structure": "Repo root: SDD_ORIENTAPP_V2.md, .env.example, app/ (Android, PRESERVED). New: web/ (Next.js app: app/ routes, lib/ domain+db+ai, db/ SQL schema, components/, data/ seed, tests/). .agents/tasks/ holds this plan."
+}
