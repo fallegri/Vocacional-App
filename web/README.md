@@ -81,6 +81,45 @@ defecto** y su comportamiento, puntajes y vista de resultados no cambian.
   se aplica igual para todos los métodos (un estudiante solo ve sus propias
   sesiones, sea cual sea el método).
 
+### Instrumentos interactivos vs. material de referencia
+
+De los métodos descritos en la documentación subida (`skills/knowledge/`), no
+todos se prestan a un **cuestionario autoaplicado de un solo puntaje**. Por eso,
+en esta etapa se implementaron como **instrumentos interactivos y
+autocalificables** solo aquellos que definen ítems y una regla de puntuación
+clara; el resto queda como **material de referencia** para la base de
+conocimiento.
+
+**Implementados como instrumentos interactivos** (se pueden tomar en
+`/assessment`, con puntaje y resultados en la app):
+
+- **RIASEC / Holland** (ya existente, método por defecto).
+- **CHASIDE** (`skills/knowledge/metodo-chaside.md`).
+- **TIPOV** (`skills/knowledge/test-tipov.md`).
+
+**De referencia / base de conocimiento** (no implementados como tests
+interactivos en esta etapa), con el motivo:
+
+- **CIP-R** (`skills/knowledge/cuestionario-cip-r.md`) y **Test Magdalena
+  Contreras / Lizarazo** (`skills/knowledge/test-magdalena-contreras.md`): son
+  cuestionarios autoaplicados **implementables**, pero **no incluidos en esta
+  etapa** (posible trabajo futuro).
+- **Instrumento de Autoorientación**
+  (`skills/knowledge/instrumento-autoorientacion.md`): es un **marco compuesto /
+  triangular** (CIP II + DAT + IHE), no un cuestionario de un solo puntaje
+  autoaplicado.
+- **Enfoque adleriano de Jaime Bernstein**
+  (`skills/knowledge/jaime-bernstein-adleriano.md`): es un **marco
+  teórico/clínico/proyectivo**, no un cuestionario de ítems autocalificable.
+- **Otros inventarios clásicos Strong y Kuder**
+  (`skills/knowledge/otros-inventarios-kuder-strong.md`): se conservan como
+  **contexto histórico / de referencia**.
+
+> **Seguimiento (follow-up):** ingerir estos documentos de referencia en la
+> **base de conocimiento (RAG)** con `pgvector` es una tarea **documentada
+> aparte** de la experiencia de test por método seleccionable. Así el Tutor IA
+> podrá citar estos marcos aunque no existan como tests interactivos.
+
 ## Autenticación y autorización (importante)
 
 La app usa **Google OAuth** mediante **Auth.js / NextAuth v5** como inicio de

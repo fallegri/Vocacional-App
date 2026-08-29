@@ -2,7 +2,7 @@
   "id": "FEAT-004",
   "type": "docs",
   "description": "Document the selectable-method feature in web/README.md (Spanish): the available vocational methods, how a user chooses one, how staff assign a method to a cohort (and how the QR flow carries it), per-method scale + scoring + interpretation, and the schema/persistence changes. Also document which uploaded methods were implemented as fully interactive instruments vs. left as reference-only knowledge-base material and why.",
-  "status": "pending",
+  "status": "completed",
   "steps": [
     "Read the current web/README.md to match its Spanish style and section structure.",
     "Add a Spanish section 'Métodos de evaluación seleccionables' documenting: (1) RIASEC/Holland (default) — Likert 1-5, 60 ítems, puntaje por dimensión, radar + afinidad de carreras; (2) CHASIDE — dicotómico Sí/No, 98 ítems (70 interés + 28 aptitud) sobre 7 áreas C,H,A,S,I,D,E, puntaje por conteo de 'Sí' con selección de las dos áreas más altas por dimensión (interés y aptitud), y aclaración de que el banco de ítems es una adaptación fiel original (el documento define estructura y calificación, no el enunciado textual); (3) TIPOV — Likert-3 (Me agrada/indiferente/desagrada = 3/2/1), 66 ítems sobre 13 dimensiones, puntaje por suma por dimensión, con la misma aclaración sobre el banco de ítems.",
@@ -19,5 +19,5 @@
     "cd web && npm run build"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Steps 1-4 (methods table, per-method scale/scoring/interpretation, user vs cohort selection + QR flow, schema/persistence via method_id + method_scores JSONB, idempotent migrations, per-method results view, ownership auth) were already present in web/README.md's '## Métodos vocacionales seleccionables' section from FEAT-003. Only the last step remained: added a new '### Instrumentos interactivos vs. material de referencia' subsection listing interactive instruments (RIASEC default, CHASIDE, TIPOV) and reference-only docs (CIP-R, Magdalena Contreras/Lizarazo, Instrumento de Autoorientación, enfoque adleriano de Bernstein, Strong/Kuder) with reasons, plus a note that RAG/pgvector ingestion of these docs is a documented follow-up. Docs-only change; no application code touched. Verified `npm run build` from web/ succeeds with NO env vars (Exit Code 0)."
 }
