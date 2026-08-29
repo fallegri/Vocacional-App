@@ -33,31 +33,84 @@ aplicación **Next.js 15 (App Router) + TypeScript**, desplegable en **Vercel** 
 
 ## Autenticación y autorización (importante)
 
-La app Android **no tiene OAuth real**: siembra usuarios y permite cambiar de rol.
-La versión web replica ese comportamiento con un **selector de usuario/rol** a
-partir de los usuarios semilla (`DEFAULT_USERS`). **No hay OAuth ni inicio de
-sesión real todavía** (fuera de alcance de esta migración).
+La app usa **Google OAuth** mediante **Auth.js / NextAuth v5** como inicio de
+sesión real y **puerta de autorización principal**. Cuando la autenticación está
+configurada, la sesión del usuario y su **rol** son la única barrera para las
+mutaciones de personal: crear cohortes, subir documentos a la base de
+conocimiento, guardar la configuración de IA y firmar el dictamen del revisor.
 
-### Barrera de personal (`STAFF_ACCESS_TOKEN`)
+> **Seguridad del build:** el build **no necesita ningún secreto**. Las variables
+> `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `AUTH_SECRET` se leen en tiempo de
+> ejecución, por lo que `next build` y `npm run typecheck` funcionan sin ellas.
+> Si no están las tres definidas, la app reporta "auth no configurado" (modo
+> demo) y sigue funcionando.
 
-Como barrera mínima para las **mutaciones de personal** (crear cohortes, subir
-documentos a la base de conocimiento, guardar la configuración de IA y firmar el
-dictamen del revisor) la app usa un **token de personal**:
+### Asignación de roles
 
-- Si defines la variable de entorno `STAFF_ACCESS_TOKEN` en el servidor, **todas**
-  esas operaciones exigen presentar el mismo token. La UI de administración
-  muestra un campo para introducirlo (se guarda solo en `sessionStorage` de la
-  pestaña) y lo reenvía en cada mutación (como argumento en las server actions y
-  en la cabecera `x-staff-token` para las rutas). El token se compara **solo en el
-  servidor** y nunca llega al navegador ni se persiste en la base de datos.
-- Si **no** defines `STAFF_ACCESS_TOKEN`, la app corre en **modo demo** y esas
-  operaciones quedan abiertas (comportamiento de demostración). El build no
-  requiere la variable, por lo que `next build` funciona sin ella.
+Al iniciar sesión con Google, el rol del usuario se resuelve a partir de su
+correo, en este orden (gana el rol **más privilegiado**):
 
-Esto **no** sustituye a una autenticación real. Antes de exponer el panel de
-administración públicamente, protégelo con autenticación real (p. ej. Vercel
-Authentication, un proveedor OAuth o middleware propio) y define
-`STAFF_ACCESS_TOKEN` para cerrar las mutaciones de personal.
+1. **Usuario semilla**: si el correo coincide con uno de `web/data/seed.ts`
+   (`DEFAULT_USERS`), se usa el rol de ese usuario.
+2. **Listas de permitidos por entorno** (correos separados por coma y/o
+   espacios, sin distinguir mayúsculas):
+   - `ADMIN_EMAILS` → **SUPER_ADMIN** (admin principal)
+   - `TEST_ADMIN_EMAILS` → **TEST_ADMIN** (coordinador de evaluaciones)
+   - `REPORT_REVIEWER_EMAILS` → **REPORT_REVIEWER** (revisor / orientador)
+3. **Por defecto**: **STUDENT** (estudiante).
+
+> **¿Cómo hago administrador a alguien?** Añade su correo de Google a
+> `ADMIN_EMAILS` (en `web/.env.local` para local, o en *Vercel → Project
+> Settings → Environment Variables* para producción) y pídele que **cierre e
+> inicie sesión de nuevo**. El rol se calcula al iniciar sesión.
+
+### Configurar Google Cloud (credenciales OAuth 2.0)
+
+1. Entra a [Google Cloud Console](https://console.cloud.google.com/) y crea (o
+   selecciona) un proyecto.
+2. Configura la **pantalla de consentimiento de OAuth** (*APIs & Services →
+   OAuth consent screen*): tipo **External**, nombre de la app, correo de
+   soporte y datos de contacto. Mientras esté en modo *Testing*, agrega como
+   *Test users* los correos que vayan a iniciar sesión.
+3. Crea las credenciales (*APIs & Services → Credentials → Create Credentials →
+   OAuth client ID*): tipo de aplicación **Aplicación web** (*Web application*).
+4. En **URIs de redirección autorizados** (*Authorized redirect URIs*) agrega:
+   - Local: `http://localhost:3000/api/auth/callback/google`
+   - Producción: `https://<tu-app>.vercel.app/api/auth/callback/google`
+5. Guarda y copia el **Client ID** y el **Client Secret**.
+
+### Variables de entorno para OAuth
+
+En **local** (`web/.env.local`):
+
+```bash
+GOOGLE_CLIENT_ID=tu-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=tu-client-secret
+AUTH_SECRET=<genera-uno: openssl rand -base64 32>
+# ADMIN_EMAILS, TEST_ADMIN_EMAILS, REPORT_REVIEWER_EMAILS son opcionales.
+ADMIN_EMAILS=director@tu-institucion.edu
+```
+
+En **Vercel** (*Project Settings → Environment Variables*): define las mismas
+`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `AUTH_SECRET` y, si las usas, las
+listas `*_EMAILS`. Auth.js v5 **infiere la URL automáticamente en Vercel**, así
+que no necesitas `AUTH_URL`. En otros hosts (dominios propios o proxys) define
+`AUTH_URL` (o el equivalente `NEXTAUTH_URL`) con la URL pública de la app.
+
+### `STAFF_ACCESS_TOKEN` (fallback opcional, superado por OAuth)
+
+El antiguo token de personal se conserva **solo como fallback local/demo** y
+únicamente tiene efecto cuando **Google OAuth no está configurado**:
+
+- **Sin OAuth y con `STAFF_ACCESS_TOKEN` definido**: las mutaciones de personal
+  exigen presentar ese token (comportamiento heredado). La UI de administración
+  muestra un campo para introducirlo (se guarda solo en `sessionStorage`) y lo
+  reenvía como argumento en las server actions y en la cabecera `x-staff-token`
+  para las rutas. El token se compara **solo en el servidor**.
+- **Sin OAuth y sin `STAFF_ACCESS_TOKEN`**: la app corre en **modo demo** y esas
+  operaciones quedan abiertas (útil para desarrollo/demostración).
+- **Con OAuth configurado**: el token queda **inactivo**; la autorización es
+  exclusivamente por sesión + rol de Google.
 
 ### API key de IA en reposo (nota de seguridad)
 
@@ -111,7 +164,14 @@ subas `.env.local` ni claves reales.**
 | --------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`        | Sí (runtime) | Cadena de conexión de Neon Postgres, p. ej. `postgres://usuario:password@host.neon.tech/orientapp?sslmode=require`. Se lee de forma perezosa; el build funciona sin ella. |
 | `NEXT_PUBLIC_APP_URL` | No        | URL base pública para construir los enlaces de los QR de cada cohorte (p. ej. `https://tu-app.vercel.app`). Si no se define, se usa el origin de la petición/navegador.  |
-| `STAFF_ACCESS_TOKEN`  | No (recom. en prod) | Token que exige la app para las mutaciones de personal (crear cohortes, subir documentos, guardar ajustes de IA, firmar dictámenes). Si se define, esas operaciones lo requieren; si no, quedan abiertas (modo demo). Solo se usa en el servidor. |
+| `GOOGLE_CLIENT_ID`    | No (runtime; recom.) | ID de cliente OAuth 2.0 de Google. Junto con `GOOGLE_CLIENT_SECRET` y `AUTH_SECRET` activa el inicio de sesión con Google. Se lee en runtime; el build no la requiere. |
+| `GOOGLE_CLIENT_SECRET`| No (runtime; recom.) | Secreto de cliente OAuth 2.0 de Google. **Solo se usa en el servidor.** |
+| `AUTH_SECRET`         | No (runtime; recom.) | Secreto para firmar la sesión JWT de Auth.js (genera uno con `openssl rand -base64 32`). Necesario (con las dos anteriores) para activar OAuth. |
+| `AUTH_URL` / `NEXTAUTH_URL` | No  | URL pública de la app para los callbacks de OAuth. En Vercel se infiere automáticamente; defínela solo en otros hosts/dominios propios. |
+| `ADMIN_EMAILS`        | No        | Correos (separados por coma/espacios) que reciben el rol **SUPER_ADMIN** al iniciar sesión con Google. |
+| `TEST_ADMIN_EMAILS`   | No        | Correos que reciben el rol **TEST_ADMIN**. |
+| `REPORT_REVIEWER_EMAILS` | No     | Correos que reciben el rol **REPORT_REVIEWER**. |
+| `STAFF_ACCESS_TOKEN`  | No (fallback) | **Fallback local/demo superado por Google OAuth.** Solo tiene efecto cuando OAuth **no** está configurado: si se define, las mutaciones de personal exigen el token; si no, quedan abiertas (modo demo). Con OAuth configurado queda inactivo. Solo se usa en el servidor. |
 | `AI_PROVIDER_TYPE`    | No        | Proveedor de IA: `NVIDIA_NIM` \| `OPENAI` \| `LOCAL_AI` \| `CUSTOM`. Por defecto `NVIDIA_NIM`.                                                                            |
 | `AI_BASE_URL`         | No        | URL base del endpoint compatible con OpenAI (p. ej. `https://api.openai.com/v1`).                                                                                        |
 | `AI_API_KEY`          | No        | Clave del proveedor de IA. **Solo se usa en el servidor; nunca llega al navegador.**                                                                                     |
@@ -189,6 +249,10 @@ npm run db:seed
    - `NEXT_PUBLIC_APP_URL` con el dominio de producción (p. ej.
      `https://tu-app.vercel.app`) para que los QR apunten al dominio correcto y
      no a `localhost`.
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` y `AUTH_SECRET` para habilitar el
+     inicio de sesión con Google (ver *Autenticación y autorización*). En Vercel
+     no hace falta `AUTH_URL` (se infiere). Opcionalmente `ADMIN_EMAILS`,
+     `TEST_ADMIN_EMAILS` y `REPORT_REVIEWER_EMAILS` para asignar roles por correo.
    - Las variables `AI_*` si vas a usar el Asesor/Tutor IA y la base de
      conocimiento.
 4. Haz clic en **Deploy**.
@@ -220,7 +284,7 @@ web/
 ├── db/           # schema.sql: esquema autoritativo de Neon (+ pgvector)
 ├── lib/          # Dominio RIASEC, cliente Neon (lazy), IA y base de conocimiento
 ├── scripts/      # seed.ts: aplica el esquema y siembra la base
-└── tests/        # Tests unitarios del motor psicométrico (Vitest)
+└── tests/        # Tests unitarios (motor psicométrico, IA, RAG, roles/auth)
 ```
 
 ## Verificación
