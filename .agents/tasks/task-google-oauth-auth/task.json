@@ -1,7 +1,14 @@
 {
   "task_id": "task-google-oauth-auth",
   "task_description": "Add real Google OAuth sign-in (Auth.js v5 / next-auth@beta with the Google provider) to the OrientApp Next.js web app under web/, with role-based authorization (SUPER_ADMIN/TEST_ADMIN/REPORT_REVIEWER/STUDENT) that supersedes the interim STAFF_ACCESS_TOKEN shared-token barrier. Protect the four staff mutation entry points (createCohort, saveAiConfig, POST /api/knowledge, PATCH /api/sessions/[id]/review) and the /admin/* pages with real session+role checks, wire Google sign-in/sign-out UI, link/create Google users in app_users on first login, and document setup. Preserve the invariant that `next build` succeeds with NO env vars set and the lazy DB access pattern. Work stays on branch feat/web-migration-vercel-neon; no push/PR.",
-  "status": "in_progress",
+  "status": "completed",
   "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
-  "blocked_reason": null
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "From web/: npm run typecheck, npm run lint pass. npm run test -- --run passes 68 tests (auth-roles.test.ts adds 25 meaningful role-based tests exercising the real resolveRoleForEmail/isStaffRole/isAuthConfigured plus the role-gated authorizeStaff guard; they fail if the role model is reverted). env -i clean-env npm run build succeeds with NO env vars, and the new /api/auth/[...nextauth] route is present. Verified the four mutation entry points enforce roles (createCohort/saveAiConfig: SUPER_ADMIN|TEST_ADMIN; POST /api/knowledge: any staff; PATCH review: REPORT_REVIEWER|SUPER_ADMIN) and /admin pages do server-side requireStaff checks with an AccessRestricted fallback, preserving demo mode when auth is unconfigured. No Dockerfile in web/, so docker_build skipped."
+  }
 }
