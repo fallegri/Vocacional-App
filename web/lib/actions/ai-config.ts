@@ -1,6 +1,7 @@
 "use server";
 
 import { query } from "@/lib/db";
+import { authorizeStaff } from "@/lib/auth/staff";
 import {
   AI_PROVIDERS,
   resolveAiConfig,
@@ -56,7 +57,16 @@ export async function saveAiConfig(input: {
   apiKey: string;
   modelName: string;
   temperature: number;
+  /** Token de personal; obligatorio si STAFF_ACCESS_TOKEN está definido. */
+  staffToken?: string | null;
 }): Promise<SaveAiConfigResult> {
+  // Guardia de personal: reconfigurar el proveedor de IA (incluida la API key)
+  // es una operación sensible de staff.
+  const auth = authorizeStaff(input.staffToken);
+  if (!auth.ok) {
+    return { ok: false, error: auth.error };
+  }
+
   const provider = AI_PROVIDERS[input.providerType];
   if (!provider) {
     return { ok: false, error: "Proveedor de IA inválido." };

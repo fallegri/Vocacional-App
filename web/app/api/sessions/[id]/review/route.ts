@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { updateSessionReview } from "@/lib/sessions";
 import { REVIEW_STATUS, type ReviewStatusCode } from "@/lib/riasec/types";
+import { authorizeStaffRequest } from "@/lib/auth/staff";
 
 // Fuerza el renderizado dinámico: nunca se ejecuta durante el build.
 export const dynamic = "force-dynamic";
@@ -21,6 +22,12 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Guardia de personal: el dictamen del revisor es una operación de staff.
+  const auth = authorizeStaffRequest(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: 401 });
+  }
+
   const { id } = await params;
   if (!id) {
     return NextResponse.json(

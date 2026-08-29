@@ -1,5 +1,6 @@
 import AiSettingsClient from "@/components/AiSettingsClient";
 import { getAiConfigView } from "@/lib/actions/ai-config";
+import { isStaffAuthEnabled } from "@/lib/auth/staff";
 
 export const metadata = {
   title: "Ajustes de IA | OrientApp",
@@ -21,7 +22,7 @@ export default async function AiSettingsPage() {
           <strong>{initial.configured ? "Configurado" : "Sin configurar"}</strong>.
         </p>
       </div>
-      <AiSettingsClient initial={initial} />
+      <AiSettingsClient initial={initial} staffAuthEnabled={isStaffAuthEnabled()} />
     </main>
   );
 }

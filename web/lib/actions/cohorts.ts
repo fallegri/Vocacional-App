@@ -2,6 +2,7 @@
 
 import { query } from "@/lib/db";
 import { DEFAULT_COHORTS } from "@/data/seed";
+import { authorizeStaff } from "@/lib/auth/staff";
 import type { CohortGroup } from "@/lib/riasec/types";
 
 export interface CreateCohortResult {
@@ -57,7 +58,15 @@ export async function createCohort(input: {
   institution: string;
   creatorName: string;
   description?: string;
+  /** Token de personal; obligatorio si STAFF_ACCESS_TOKEN está definido. */
+  staffToken?: string | null;
 }): Promise<CreateCohortResult> {
+  // Guardia de personal: crear una cohorte es una operación de staff.
+  const auth = authorizeStaff(input.staffToken);
+  if (!auth.ok) {
+    return { ok: false, error: auth.error };
+  }
+
   const code = (input.code ?? "").trim().toUpperCase();
   const title = (input.title ?? "").trim();
   const institution = (input.institution ?? "").trim();

@@ -124,7 +124,7 @@ export async function completeChat(
 }
 
 interface EmbeddingsResponse {
-  data?: Array<{ embedding?: number[] }>;
+  data?: Array<{ embedding?: number[]; index?: number }>;
   error?: { message?: string };
 }
 
@@ -198,7 +198,20 @@ export async function embedTexts(
     }
 
     const data = parsed?.data ?? [];
-    const vectors = data
+
+    // La API de OpenAI (y compatibles) puede devolver los embeddings en un
+    // orden distinto al de "input" o dividir lotes grandes; cada entrada trae
+    // su posición en el campo `index`. Ordenamos por `index` ANTES de extraer
+    // los vectores para no desalinear embedding<->fragmento. Cuando `index` no
+    // viene, se conserva el orden de llegada como respaldo estable.
+    const ordered = data
+      .map((d, position) => ({
+        embedding: d.embedding,
+        index: typeof d.index === "number" ? d.index : position,
+      }))
+      .sort((a, b) => a.index - b.index);
+
+    const vectors = ordered
       .map((d) => d.embedding)
       .filter((v): v is number[] => Array.isArray(v) && v.length > 0);
 
@@ -206,6 +219,16 @@ export async function embedTexts(
       return {
         ok: false,
         error: "El proveedor no devolvió vectores de embedding.",
+      };
+    }
+
+    // Exige una correspondencia 1:1 entre entradas y vectores. Si el proveedor
+    // devolvió un lote parcial (menos vectores que textos), fallamos en vez de
+    // asociar embeddings a los fragmentos equivocados.
+    if (vectors.length !== inputs.length) {
+      return {
+        ok: false,
+        error: `El proveedor devolvió ${vectors.length} vectores para ${inputs.length} textos; no se puede garantizar la correspondencia.`,
       };
     }
 

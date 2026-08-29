@@ -11,6 +11,7 @@ import {
   KNOWLEDGE_SOURCE_TYPES,
   type KnowledgeSourceType,
 } from "@/lib/knowledge/ingest";
+import { authorizeStaffRequest } from "@/lib/auth/staff";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -35,6 +36,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  // Guardia de personal: en producción (con STAFF_ACCESS_TOKEN definido) rechaza
+  // ingestas sin token válido. En modo demo (sin token) se permite.
+  const auth = authorizeStaffRequest(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: 401 });
+  }
+
   let body: IngestBody;
   try {
     body = (await request.json()) as IngestBody;

@@ -31,14 +31,42 @@ aplicación **Next.js 15 (App Router) + TypeScript**, desplegable en **Vercel** 
   cohorte), gestión de cohortes con su QR, dictamen del revisor y directorio de
   usuarios.
 
-## Autenticación (importante)
+## Autenticación y autorización (importante)
 
 La app Android **no tiene OAuth real**: siembra usuarios y permite cambiar de rol.
 La versión web replica ese comportamiento con un **selector de usuario/rol** a
 partir de los usuarios semilla (`DEFAULT_USERS`). **No hay OAuth ni inicio de
-sesión real todavía** (fuera de alcance de esta migración). Antes de exponer el
-panel de administración públicamente, protégelo con autenticación real
-(p. ej. Vercel Authentication, un proveedor OAuth o middleware propio).
+sesión real todavía** (fuera de alcance de esta migración).
+
+### Barrera de personal (`STAFF_ACCESS_TOKEN`)
+
+Como barrera mínima para las **mutaciones de personal** (crear cohortes, subir
+documentos a la base de conocimiento, guardar la configuración de IA y firmar el
+dictamen del revisor) la app usa un **token de personal**:
+
+- Si defines la variable de entorno `STAFF_ACCESS_TOKEN` en el servidor, **todas**
+  esas operaciones exigen presentar el mismo token. La UI de administración
+  muestra un campo para introducirlo (se guarda solo en `sessionStorage` de la
+  pestaña) y lo reenvía en cada mutación (como argumento en las server actions y
+  en la cabecera `x-staff-token` para las rutas). El token se compara **solo en el
+  servidor** y nunca llega al navegador ni se persiste en la base de datos.
+- Si **no** defines `STAFF_ACCESS_TOKEN`, la app corre en **modo demo** y esas
+  operaciones quedan abiertas (comportamiento de demostración). El build no
+  requiere la variable, por lo que `next build` funciona sin ella.
+
+Esto **no** sustituye a una autenticación real. Antes de exponer el panel de
+administración públicamente, protégelo con autenticación real (p. ej. Vercel
+Authentication, un proveedor OAuth o middleware propio) y define
+`STAFF_ACCESS_TOKEN` para cerrar las mutaciones de personal.
+
+### API key de IA en reposo (nota de seguridad)
+
+Cuando la configuración de IA se guarda desde **Ajustes de IA**, la API key se
+almacena **en claro** en la tabla `ai_config` de Neon (sin cifrado en reposo).
+Para producción, prefiere configurar la clave mediante la variable de entorno
+`AI_API_KEY`: tiene prioridad sobre la fila de `ai_config` y evita dejar la clave
+persistida en la base de datos. Si usas la tabla `ai_config`, restringe el acceso
+a la base y considera cifrado a nivel de columna o un gestor de secretos.
 
 ## Requisitos
 
@@ -83,6 +111,7 @@ subas `.env.local` ni claves reales.**
 | --------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`        | Sí (runtime) | Cadena de conexión de Neon Postgres, p. ej. `postgres://usuario:password@host.neon.tech/orientapp?sslmode=require`. Se lee de forma perezosa; el build funciona sin ella. |
 | `NEXT_PUBLIC_APP_URL` | No        | URL base pública para construir los enlaces de los QR de cada cohorte (p. ej. `https://tu-app.vercel.app`). Si no se define, se usa el origin de la petición/navegador.  |
+| `STAFF_ACCESS_TOKEN`  | No (recom. en prod) | Token que exige la app para las mutaciones de personal (crear cohortes, subir documentos, guardar ajustes de IA, firmar dictámenes). Si se define, esas operaciones lo requieren; si no, quedan abiertas (modo demo). Solo se usa en el servidor. |
 | `AI_PROVIDER_TYPE`    | No        | Proveedor de IA: `NVIDIA_NIM` \| `OPENAI` \| `LOCAL_AI` \| `CUSTOM`. Por defecto `NVIDIA_NIM`.                                                                            |
 | `AI_BASE_URL`         | No        | URL base del endpoint compatible con OpenAI (p. ej. `https://api.openai.com/v1`).                                                                                        |
 | `AI_API_KEY`          | No        | Clave del proveedor de IA. **Solo se usa en el servidor; nunca llega al navegador.**                                                                                     |

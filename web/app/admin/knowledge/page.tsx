@@ -1,8 +1,13 @@
 import KnowledgeAdminClient from "@/components/KnowledgeAdminClient";
+import { isStaffAuthEnabled } from "@/lib/auth/staff";
 
 export const metadata = {
   title: "Base de Conocimiento | OrientApp",
 };
+
+// Lee STAFF_ACCESS_TOKEN en tiempo de ejecución para decidir si mostrar el campo
+// de token; nunca se evalúa durante el build.
+export const dynamic = "force-dynamic";
 
 export default function KnowledgeAdminPage() {
   return (
@@ -15,7 +20,7 @@ export default function KnowledgeAdminPage() {
           fragmenta e indexa con embeddings para búsqueda semántica y citación.
         </p>
       </div>
-      <KnowledgeAdminClient />
+      <KnowledgeAdminClient staffAuthEnabled={isStaffAuthEnabled()} />
     </main>
   );
 }

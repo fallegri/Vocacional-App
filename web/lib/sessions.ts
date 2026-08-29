@@ -4,7 +4,7 @@
 // todas usan el cliente perezoso de web/lib/db.ts.
 // ===========================================================================
 
-import { query } from "@/lib/db";
+import { query, withTransaction } from "@/lib/db";
 import type {
   AssessmentAnswer,
   CareerMatch,
@@ -49,64 +49,78 @@ export interface PersistSessionInput {
 /**
  * Inserta una fila en assessment_sessions y una fila por cada respuesta en
  * assessment_responses. Solo debe llamarse en tiempo de ejecución del servidor.
+ *
+ * Ambas escrituras (la sesión y todas sus respuestas) se ejecutan dentro de una
+ * ÚNICA transacción: si falla la inserción de cualquier respuesta se hace
+ * ROLLBACK completo, de modo que nunca queda una sesión huérfana o con
+ * respuestas incompletas detrás de un 201. La conexión se libera siempre
+ * (ver withTransaction en lib/db.ts).
+ *
+ * Nota sobre `cohortCode`: se almacena tal cual lo envía el cliente y NO se
+ * valida que la cohorte exista. Es intencional: la inscripción es abierta vía
+ * QR (`/g/{CODIGO}`) y un estudiante puede completar el test aunque la cohorte
+ * aún no esté sembrada en la base o se genere un QR sin conexión. El personal
+ * filtra y audita las evaluaciones por cohorte en el panel de administración.
  */
 export async function persistSession(input: PersistSessionInput): Promise<void> {
   const top = input.careerMatches[0] ?? null;
 
-  await query(
-    `INSERT INTO assessment_sessions (
-        id, started_at, completed_at, is_valid, reliability_level,
-        r_score, i_score, a_score, s_score, e_score, c_score,
-        dominant_code, dominant_summary, warning_message,
-        top_career_title, top_career_affinity,
-        cohort_code, student_name, student_email, review_status
-     ) VALUES (
-        $1, $2, $3, $4, $5,
-        $6, $7, $8, $9, $10, $11,
-        $12, $13, $14,
-        $15, $16,
-        $17, $18, $19, $20
-     )
-     ON CONFLICT (id) DO NOTHING`,
-    [
-      input.id,
-      input.startedAt,
-      input.completedAt,
-      input.quality.isValid,
-      input.quality.reliabilityLevel,
-      input.scores.r,
-      input.scores.i,
-      input.scores.a,
-      input.scores.s,
-      input.scores.e,
-      input.scores.c,
-      input.dominantCode,
-      input.dominantSummary,
-      input.quality.warningMessage,
-      top ? top.career.title : null,
-      top ? top.affinityPercentage : null,
-      input.cohortCode ?? null,
-      input.studentName ?? null,
-      input.studentEmail ?? null,
-      "PENDING",
-    ]
-  );
-
-  for (const ans of input.answers) {
-    await query(
-      `INSERT INTO assessment_responses (
-          session_id, question_id, dimension_code, score, time_spent_ms, answered_at
-       ) VALUES ($1, $2, $3, $4, $5, $6)`,
+  await withTransaction(async (tx) => {
+    await tx(
+      `INSERT INTO assessment_sessions (
+          id, started_at, completed_at, is_valid, reliability_level,
+          r_score, i_score, a_score, s_score, e_score, c_score,
+          dominant_code, dominant_summary, warning_message,
+          top_career_title, top_career_affinity,
+          cohort_code, student_name, student_email, review_status
+       ) VALUES (
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, $14,
+          $15, $16,
+          $17, $18, $19, $20
+       )
+       ON CONFLICT (id) DO NOTHING`,
       [
         input.id,
-        ans.questionId,
-        ans.dimension,
-        ans.score,
-        ans.timeSpentMs,
+        input.startedAt,
         input.completedAt,
+        input.quality.isValid,
+        input.quality.reliabilityLevel,
+        input.scores.r,
+        input.scores.i,
+        input.scores.a,
+        input.scores.s,
+        input.scores.e,
+        input.scores.c,
+        input.dominantCode,
+        input.dominantSummary,
+        input.quality.warningMessage,
+        top ? top.career.title : null,
+        top ? top.affinityPercentage : null,
+        input.cohortCode ?? null,
+        input.studentName ?? null,
+        input.studentEmail ?? null,
+        "PENDING",
       ]
     );
-  }
+
+    for (const ans of input.answers) {
+      await tx(
+        `INSERT INTO assessment_responses (
+            session_id, question_id, dimension_code, score, time_spent_ms, answered_at
+         ) VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          input.id,
+          ans.questionId,
+          ans.dimension,
+          ans.score,
+          ans.timeSpentMs,
+          input.completedAt,
+        ]
+      );
+    }
+  });
 }
 
 export interface SessionSummary {

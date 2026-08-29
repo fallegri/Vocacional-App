@@ -3,12 +3,16 @@
 import { useState } from "react";
 import { saveAiConfig, type AiConfigView } from "@/lib/actions/ai-config";
 import { AI_PROVIDERS, type AiProviderTypeCode } from "@/lib/ai/config";
+import { useStaffToken } from "@/components/useStaffToken";
+import StaffTokenField from "@/components/StaffTokenField";
 
 interface Props {
   initial: AiConfigView;
+  staffAuthEnabled: boolean;
 }
 
-export default function AiSettingsClient({ initial }: Props) {
+export default function AiSettingsClient({ initial, staffAuthEnabled }: Props) {
+  const { token: staffToken, setToken: setStaffToken } = useStaffToken();
   const [providerType, setProviderType] = useState<AiProviderTypeCode>(
     initial.providerType
   );
@@ -42,6 +46,7 @@ export default function AiSettingsClient({ initial }: Props) {
       apiKey: apiKey.trim(),
       modelName: modelName.trim(),
       temperature,
+      staffToken,
     });
     setPending(false);
 
@@ -60,6 +65,12 @@ export default function AiSettingsClient({ initial }: Props) {
       <p className="muted" style={{ marginTop: 0 }}>
         NVIDIA NIM / OpenAI / Local. La API key se almacena solo en el servidor y
         nunca se envía al navegador.
+      </p>
+      <p className="muted" style={{ marginTop: 0, fontSize: 12 }}>
+        Nota de seguridad: la API key guardada aquí se almacena <strong>en claro</strong>{" "}
+        en la tabla <code>ai_config</code> de Neon. Para producción, prefiere
+        configurarla mediante la variable de entorno <code>AI_API_KEY</code> (que
+        tiene prioridad y no queda en la base de datos).
       </p>
 
       <form className="stack" onSubmit={handleSave}>
@@ -171,6 +182,12 @@ export default function AiSettingsClient({ initial }: Props) {
             onChange={(e) => setTemperature(Number(e.target.value))}
           />
         </div>
+
+        <StaffTokenField
+          enabled={staffAuthEnabled}
+          token={staffToken}
+          setToken={setStaffToken}
+        />
 
         {error ? (
           <div className="alert alert-warning" role="alert">

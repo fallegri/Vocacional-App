@@ -61,6 +61,11 @@ CREATE INDEX IF NOT EXISTS idx_assessment_responses_question_id
 
 -- ---------------------------------------------------------------------------
 -- Configuración de IA (ai_config) - fila única id = 1
+-- NOTA DE SEGURIDAD: api_key se guarda EN CLARO (sin cifrado en reposo). Para
+-- producción, prefiere configurar la clave con la variable de entorno
+-- AI_API_KEY (tiene prioridad y no queda en la base). Si usas esta tabla,
+-- restringe el acceso a la base y considera cifrado a nivel de columna o un
+-- gestor de secretos. Ver web/README.md > "API key de IA en reposo".
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS ai_config (
     id            INT PRIMARY KEY DEFAULT 1,

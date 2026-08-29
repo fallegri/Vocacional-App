@@ -3,6 +3,11 @@
 import { useMemo, useState } from "react";
 import QrCode from "@/components/QrCode";
 import { createCohort } from "@/lib/actions/cohorts";
+import {
+  useStaffToken,
+  STAFF_TOKEN_HEADER,
+} from "@/components/useStaffToken";
+import StaffTokenField from "@/components/StaffTokenField";
 import { buildCohortTestUrl, normalizeCohortCode } from "@/lib/qr";
 import { DEFAULT_USERS } from "@/data/seed";
 import {
@@ -35,10 +40,13 @@ function formatDate(ms: number | null): string {
 export default function AdminClient({
   initialCohorts,
   initialSessions,
+  staffAuthEnabled,
 }: {
   initialCohorts: CohortGroup[];
   initialSessions: SessionSummary[];
+  staffAuthEnabled: boolean;
 }) {
+  const { token: staffToken, setToken: setStaffToken } = useStaffToken();
   // Selector de usuario/rol activo (la app Android no tiene auth real: siembra
   // usuarios y permite cambiar de rol). Se documenta que OAuth real queda fuera
   // de alcance (ver README / FEAT-005).
@@ -126,8 +134,23 @@ export default function AdminClient({
       institution: institution.trim(),
       creatorName: activeUser.displayName,
       description: description.trim(),
+      staffToken,
     });
     setPending(false);
+
+    // Si el servidor rechaza por autorización (token de personal ausente o
+    // inválido), NO generamos el QR: la operación no se realizó.
+    const unauthorized =
+      !result.ok &&
+      typeof result.error === "string" &&
+      /token de personal/i.test(result.error);
+
+    if (unauthorized) {
+      setError(
+        `${result.error} Introduce el token de acceso del personal y vuelve a intentarlo.`
+      );
+      return;
+    }
 
     if (!result.ok) {
       setError(
@@ -182,7 +205,10 @@ export default function AdminClient({
     try {
       const res = await fetch(`/api/sessions/${reviewSessionId}/review`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(staffToken ? { [STAFF_TOKEN_HEADER]: staffToken } : {}),
+        },
         body: JSON.stringify({
           reviewerNotes: notesDraft.trim(),
           reviewStatus: statusDraft,
@@ -258,6 +284,13 @@ export default function AdminClient({
           real (OAuth queda fuera de alcance de esta etapa).
         </p>
       </div>
+
+      {/* Token de personal (solo si el servidor lo exige) */}
+      <StaffTokenField
+        enabled={staffAuthEnabled}
+        token={staffToken}
+        setToken={setStaffToken}
+      />
 
       {/* Pestañas */}
       <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>

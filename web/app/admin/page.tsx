@@ -1,6 +1,7 @@
 import AdminClient from "@/components/AdminClient";
 import { listCohorts } from "@/lib/actions/cohorts";
 import { listSessions } from "@/lib/sessions";
+import { isStaffAuthEnabled } from "@/lib/auth/staff";
 
 // Fuerza el renderizado dinámico: los datos de Neon se leen solo en tiempo de
 // ejecución, nunca durante `next build`. Las funciones de carga están además
@@ -36,7 +37,11 @@ export default async function AdminPage() {
           </a>
         </div>
       </div>
-      <AdminClient initialCohorts={cohorts} initialSessions={sessions} />
+      <AdminClient
+        initialCohorts={cohorts}
+        initialSessions={sessions}
+        staffAuthEnabled={isStaffAuthEnabled()}
+      />
     </main>
   );
 }
