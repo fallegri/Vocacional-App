@@ -64,6 +64,14 @@ correo, en este orden (gana el rol **más privilegiado**):
 > Settings → Environment Variables* para producción) y pídele que **cierre e
 > inicie sesión de nuevo**. El rol se calcula al iniciar sesión.
 
+> **El rol se resuelve una sola vez al iniciar sesión.** Auth.js calcula el rol
+> en el callback `jwt` en el primer inicio de sesión y lo guarda en el token JWT.
+> Por eso, cualquier cambio de rol o de las listas de permitidos (`ADMIN_EMAILS`,
+> `TEST_ADMIN_EMAILS`, `REPORT_REVIEWER_EMAILS`) **no surte efecto** hasta que el
+> usuario **cierra sesión y vuelve a iniciar sesión**. Con la estrategia JWT no
+> hay sesión en el servidor que revocar, así que no es posible refrescar el rol
+> en caliente.
+
 ### Configurar Google Cloud (credenciales OAuth 2.0)
 
 1. Entra a [Google Cloud Console](https://console.cloud.google.com/) y crea (o
