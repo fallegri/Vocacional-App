@@ -120,6 +120,83 @@ El antiguo token de personal se conserva **solo como fallback local/demo** y
 - **Con OAuth configurado**: el token queda **inactivo**; la autorización es
   exclusivamente por sesión + rol de Google.
 
+### Matriz de roles y permisos
+
+La autorización se aplica en el **servidor** tanto para las **lecturas** como
+para las **mutaciones**. Con Google OAuth configurado, cada acción exige el rol
+adecuado; las lecturas de resultados de un estudiante están además restringidas
+por **propiedad de la sesión** (ver más abajo). Los roles de personal (staff)
+son **REPORT_REVIEWER**, **TEST_ADMIN** y **SUPER_ADMIN**.
+
+Leyenda: ✅ permitido · ⛔ denegado · 🔒 solo si es el dueño de la sesión.
+
+| Acción / endpoint                                                      | STUDENT | REPORT_REVIEWER | TEST_ADMIN | SUPER_ADMIN |
+| ---------------------------------------------------------------------- | :-----: | :-------------: | :--------: | :---------: |
+| Tomar el test / entrar por `/g/{codigo}`                               |   ✅    |       ✅        |     ✅     |     ✅      |
+| Ver **resultados propios** (`/results/{id}`)                           |   🔒    |       ✅        |     ✅     |     ✅      |
+| Ver **resultados de otros** (`/results/{id}`)                          |   ⛔    |       ✅        |     ✅     |     ✅      |
+| Informe IA y Tutor IA **sobre una sesión** (`/api/ai/report`, `/api/ai/chat`) | 🔒 |    ✅        |     ✅     |     ✅      |
+| Chat general del Tutor IA **sin sesión** (sin `sessionId`)             |   ✅    |       ✅        |     ✅     |     ✅      |
+| Listar documentos de conocimiento (`GET /api/knowledge`)              |   ⛔    |       ✅        |     ✅     |     ✅      |
+| Subir documentos de conocimiento (`POST /api/knowledge`)             |   ⛔    |       ✅        |     ✅     |     ✅      |
+| Panel `/admin` (evaluaciones, cohortes, usuarios)                     |   ⛔    |       ✅        |     ✅     |     ✅      |
+| Dictamen del revisor (`PATCH /api/sessions/{id}/review`)             |   ⛔    |       ✅        |     ⛔     |     ✅      |
+| Crear cohortes / guardar configuración de IA                          |   ⛔    |       ⛔        |     ✅     |     ✅      |
+
+> El dictamen del revisor lo firman **REPORT_REVIEWER** y **SUPER_ADMIN**; crear
+> cohortes y guardar la configuración de IA los hacen **TEST_ADMIN** y
+> **SUPER_ADMIN**. Un usuario anónimo (sin iniciar sesión, con OAuth activo)
+> solo puede **tomar el test**; cualquier lectura o mutación de personal se
+> rechaza con **403** y un mensaje en español.
+
+### Propiedad de la sesión del estudiante
+
+Un **STUDENT** solo puede leer los resultados y usar la IA sobre **sus propias
+sesiones**. La propiedad se determina y se aplica así:
+
+- **Al crear la sesión** (`POST /api/sessions`): si el usuario ha iniciado
+  sesión, el `student_email` de la sesión se fija con el **correo autenticado**,
+  **ignorando** el valor que envíe el cliente. Ese correo pasa a ser la **clave
+  de propiedad**. Si nadie ha iniciado sesión (anónimo/demo), se usa el
+  `studentEmail` que envía el cliente, como antes. El nombre para mostrar
+  (`studentName`) sí puede seguir viniendo del cliente.
+- **Al leer** (`/results/{id}`, `/api/ai/report`, `/api/ai/chat`): un STUDENT
+  puede leer **solo** las sesiones cuyo `student_email` **coincida** con su
+  correo autenticado (**sin distinguir mayúsculas/minúsculas**). El personal
+  (staff) puede leer **cualquier** sesión.
+- Las sesiones con `student_email` **nulo o vacío** son **solo para personal**
+  (ningún estudiante las puede leer).
+- Cuando un STUDENT que no es dueño intenta abrir `/results/{id}`, la página
+  muestra el componente **`AccessRestricted`** (en lugar de los resultados); las
+  rutas de IA devuelven **403**.
+
+### Modo demo / autenticación no configurada
+
+Cuando **Google OAuth no está configurado** (`isAuthConfigured() === false`, es
+decir, faltan una o más de `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` o
+`AUTH_SECRET`):
+
+- El proveedor de OAuth queda **inactivo** y **las lecturas quedan abiertas**:
+  `/results/{id}`, `GET /api/knowledge`, el informe y el tutor IA sobre una
+  sesión funcionan sin restricción de propiedad ni de rol. Esto es
+  **intencional** para que `next build` sin variables de entorno y las
+  demostraciones locales sigan funcionando.
+- Las **mutaciones** de personal siguen protegidas por el fallback heredado
+  `STAFF_ACCESS_TOKEN` (ver arriba): si está definido se exige el token; si no,
+  quedan abiertas (demo).
+- Este comportamiento abierto es una **degradación deliberada para
+  demo/desarrollo**, **no** la postura de producción. En producción, define las
+  tres variables de OAuth para que la matriz de roles y la propiedad de sesión se
+  apliquen de verdad.
+
+### Cambio de comportamiento (lecturas ahora protegidas)
+
+A diferencia de versiones anteriores, con OAuth configurado las **lecturas** ya
+**no** están abiertas: `GET /api/knowledge` es **solo para personal** y
+`/results/{id}` exige ser **dueño de la sesión** o **personal**. Antes ambas
+eran de acceso libre. En modo demo (sin OAuth) se conserva el acceso abierto
+descrito arriba.
+
 ### API key de IA en reposo (nota de seguridad)
 
 Cuando la configuración de IA se guarda desde **Ajustes de IA**, la API key se
