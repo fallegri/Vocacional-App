@@ -1,7 +1,9 @@
 import Link from "next/link";
 import RadarChart from "@/components/RadarChart";
 import AiReportClient from "@/components/AiReportClient";
+import AccessRestricted from "@/components/AccessRestricted";
 import { loadSession } from "@/lib/sessions";
+import { authorizeSessionRead } from "@/lib/auth/read-access";
 import { matchCareers } from "@/lib/riasec/engine";
 import { CAREERS } from "@/data/seed";
 import {
@@ -81,6 +83,19 @@ export default async function ResultsPage({
           </Link>
         </div>
       </main>
+    );
+  }
+
+  // Autorización de lectura: en modo demo (sin OAuth) se preserva el acceso
+  // abierto; con OAuth configurado, solo el dueño (por correo) o el personal
+  // (staff) pueden ver los resultados.
+  const readAuth = await authorizeSessionRead(session);
+  if (!readAuth.ok) {
+    return (
+      <AccessRestricted
+        redirectTo={`/results/${sessionId}`}
+        signedIn={Boolean(readAuth.user)}
+      />
     );
   }
 

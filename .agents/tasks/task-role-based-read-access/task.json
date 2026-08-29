@@ -1,0 +1,7 @@
+{
+  "task_id": "task-role-based-read-access",
+  "task_description": "Extend the existing OAuth role-based authorization so that READ endpoints and pages are also gated by role, not only mutations. Students may view only their own results/sessions/history (ownership via authenticated email); staff may read admin/knowledge/evaluations data per role tiers; GET /api/knowledge becomes staff-only. Preserve the no-env build invariant and graceful demo mode when auth is not configured. All user-facing text in Spanish. Update README with the role->permission matrix. Work on branch feat/web-migration-vercel-neon; do not push.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

@@ -20,6 +20,7 @@ import {
   type TutorTurn,
 } from "@/lib/ai/prompts";
 import { retrieveRelevantPassages } from "@/lib/knowledge/retrieve";
+import { authorizeSessionRead } from "@/lib/auth/read-access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -66,19 +67,30 @@ export async function POST(request: Request) {
   const ctx: TutorContext = {};
   const sessionId = (body.sessionId ?? "").trim();
   if (sessionId) {
+    let session = null;
     try {
-      const session = await loadSession(sessionId);
-      if (session) {
-        const careerMatches = matchCareers(session.scores, CAREERS);
-        ctx.scores = session.scores;
-        ctx.dominantCode = session.dominantCode;
-        ctx.dominantSummary = session.dominantSummary;
-        ctx.reliabilityLevel = session.reliabilityLevel;
-        ctx.studentName = session.studentName;
-        ctx.topCareers = careerMatches;
-      }
+      session = await loadSession(sessionId);
     } catch {
       // Sin contexto psicométrico: el tutor responde de forma general.
+    }
+
+    if (session) {
+      // Autorización de lectura: solo se enfoca cuando la sesión existe. En
+      // modo demo el acceso es abierto; con OAuth configurado, un usuario que
+      // no es dueño ni personal (staff) recibe 403 en lugar de perder contexto
+      // en silencio. Una conversación general sin sessionId sigue permitida.
+      const readAuth = await authorizeSessionRead(session);
+      if (!readAuth.ok) {
+        return NextResponse.json({ error: readAuth.error }, { status: 403 });
+      }
+
+      const careerMatches = matchCareers(session.scores, CAREERS);
+      ctx.scores = session.scores;
+      ctx.dominantCode = session.dominantCode;
+      ctx.dominantSummary = session.dominantSummary;
+      ctx.reliabilityLevel = session.reliabilityLevel;
+      ctx.studentName = session.studentName;
+      ctx.topCareers = careerMatches;
     }
   }
 

@@ -24,7 +24,15 @@ interface IngestBody {
   createdBy?: string | null;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Autorización por rol: listar los documentos de la base de conocimiento es
+  // una operación de personal (staff). Con OAuth configurado exige una sesión
+  // staff; sin OAuth cae al fallback heredado (token / modo demo), igual que POST.
+  const auth = await authorizeStaffRequest(request);
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: 403 });
+  }
+
   try {
     const documents = await listDocuments();
     return NextResponse.json({ documents });

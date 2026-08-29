@@ -20,6 +20,7 @@ import {
   buildKnowledgeContextBlock,
 } from "@/lib/ai/prompts";
 import { retrieveRelevantPassages } from "@/lib/knowledge/retrieve";
+import { authorizeSessionRead } from "@/lib/auth/read-access";
 import { query } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +62,14 @@ export async function POST(request: Request) {
       { error: "No se encontró la sesión indicada." },
       { status: 404 }
     );
+  }
+
+  // Autorización de lectura: en modo demo se conserva el acceso abierto; con
+  // OAuth configurado, solo el dueño o el personal (staff) pueden generar el
+  // informe de una sesión.
+  const readAuth = await authorizeSessionRead(session);
+  if (!readAuth.ok) {
+    return NextResponse.json({ error: readAuth.error }, { status: 403 });
   }
 
   const careerMatches = matchCareers(session.scores, CAREERS);

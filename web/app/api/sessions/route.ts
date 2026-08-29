@@ -9,6 +9,7 @@ import {
   getDominantProfileDescription,
 } from "@/lib/riasec/engine";
 import { persistSession } from "@/lib/sessions";
+import { getCurrentUser } from "@/lib/auth/session";
 import type { AssessmentAnswer, DimensionCode } from "@/lib/riasec/types";
 
 // Fuerza el renderizado dinámico: nunca se ejecuta durante el build.
@@ -78,6 +79,14 @@ export async function POST(request: Request) {
   const dominantCode = getDominantCode(scores, 3);
   const dominantSummary = getDominantProfileDescription(dominantCode);
 
+  // Propiedad de la sesión: cuando hay un usuario autenticado NO confiamos en el
+  // correo enviado por el cliente; usamos el correo autenticado como clave de
+  // propiedad (owner). En modo demo/anónimo se conserva el valor del cliente.
+  const currentUser = await getCurrentUser();
+  const ownerEmail = currentUser
+    ? currentUser.email
+    : body.studentEmail ?? null;
+
   const id = randomUUID();
   const completedAt = Date.now();
   const startedAt =
@@ -98,7 +107,7 @@ export async function POST(request: Request) {
       answers: Array.from(answersMap.values()),
       cohortCode: body.cohortCode ?? null,
       studentName: body.studentName ?? null,
-      studentEmail: body.studentEmail ?? null,
+      studentEmail: ownerEmail,
     });
   } catch (err) {
     const message =
