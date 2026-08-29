@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server";
 import { CAREERS } from "@/data/seed";
 import { matchCareers } from "@/lib/riasec/engine";
+import { getMethod } from "@/lib/methods/registry";
 import { loadSession } from "@/lib/sessions";
 import { resolveAiConfig, isConfigured } from "@/lib/ai/config";
 import { completeChat } from "@/lib/ai/client";
@@ -95,13 +96,34 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: readAuth.error }, { status: 403 });
       }
 
-      const careerMatches = matchCareers(session.scores, CAREERS);
-      ctx.scores = session.scores;
-      ctx.dominantCode = session.dominantCode;
-      ctx.dominantSummary = session.dominantSummary;
-      ctx.reliabilityLevel = session.reliabilityLevel;
-      ctx.studentName = session.studentName;
-      ctx.topCareers = careerMatches;
+      if (session.methodId === "RIASEC") {
+        // Contexto RIASEC: perfil + carreras afines a partir del vector real.
+        const careerMatches = matchCareers(session.scores, CAREERS);
+        ctx.scores = session.scores;
+        ctx.dominantCode = session.dominantCode;
+        ctx.dominantSummary = session.dominantSummary;
+        ctx.reliabilityLevel = session.reliabilityLevel;
+        ctx.studentName = session.studentName;
+        ctx.topCareers = careerMatches;
+      } else {
+        // Métodos genéricos (CHASIDE, TIPOV): se usa el resultado real guardado
+        // en method_scores en lugar de emparejar carreras RIASEC contra un
+        // vector de ceros (que produciría un contexto engañoso).
+        const ms = session.methodScores;
+        ctx.method = {
+          methodId: session.methodId,
+          methodName: getMethod(session.methodId).name,
+          dominantCode: session.dominantCode || null,
+          dominantSummary: ms?.interpretation ? null : session.dominantSummary,
+          interpretation: ms?.interpretation ?? null,
+          dimensionScores: ms?.dimensionScores?.map((d) => ({
+            code: d.code,
+            title: d.title,
+            value: d.value,
+          })),
+          studentName: session.studentName,
+        };
+      }
     }
   }
 

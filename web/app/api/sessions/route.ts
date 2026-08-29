@@ -171,6 +171,9 @@ export async function POST(request: Request) {
       dimensionScores: result.dimensionScores,
       dominantCodes: result.dominantCodes,
       interpretation: result.interpretation,
+      // Datos crudos del método (p. ej. conteos Interés/Aptitud de CHASIDE)
+      // para las vistas especializadas de resultados.
+      raw: result.raw ?? null,
     };
   }
 

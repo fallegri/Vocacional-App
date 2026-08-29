@@ -24,6 +24,13 @@ export interface StoredMethodScores {
   dimensionScores: MethodResult["dimensionScores"];
   dominantCodes: string[];
   interpretation: string;
+  /**
+   * Datos crudos específicos del método para vistas especializadas.
+   * P. ej. CHASIDE expone aquí los conteos por área de Interés y Aptitud para
+   * poder graficar ambas dimensiones por separado. Opcional y retrocompatible:
+   * las filas antiguas sin este campo se cargan como `raw: null`.
+   */
+  raw?: Record<string, unknown> | null;
 }
 
 export interface StoredSession {
@@ -176,6 +183,13 @@ function parseMethodScores(value: unknown): StoredMethodScores | null {
       typeof candidate.interpretation === "string"
         ? candidate.interpretation
         : "",
+    // Retrocompatible: filas antiguas sin `raw` se cargan como null.
+    raw:
+      candidate.raw != null &&
+      typeof candidate.raw === "object" &&
+      !Array.isArray(candidate.raw)
+        ? (candidate.raw as Record<string, unknown>)
+        : null,
   };
 }
 

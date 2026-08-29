@@ -2,7 +2,11 @@ import Link from "next/link";
 import RadarChart from "@/components/RadarChart";
 import AiReportClient from "@/components/AiReportClient";
 import AccessRestricted from "@/components/AccessRestricted";
-import { loadSession, type StoredSession } from "@/lib/sessions";
+import {
+  loadSession,
+  type StoredSession,
+  type StoredMethodScores,
+} from "@/lib/sessions";
 import { authorizeSessionRead } from "@/lib/auth/read-access";
 import { matchCareers } from "@/lib/riasec/engine";
 import { CAREERS } from "@/data/seed";
@@ -354,28 +358,7 @@ function GenericMethodResults({
       </div>
 
       {isChaside ? (
-        <div className="card" style={{ marginTop: 16 }}>
-          <h2 style={{ marginTop: 0 }}>Interés vs. Aptitud</h2>
-          <p className="muted" style={{ marginTop: 0 }}>
-            CHASIDE evalúa por separado tus <strong>intereses</strong> y tus{" "}
-            <strong>aptitudes</strong> en cada área. Un perfil alineado muestra
-            interés y aptitud altos en las mismas áreas.
-          </p>
-          <div className="stack">
-            {sorted.map((dim) => (
-              <div
-                key={`chaside-${dim.code}`}
-                className="row spread"
-                style={{ fontSize: 14 }}
-              >
-                <span>
-                  {dim.code} · {dim.title}
-                </span>
-                <span className="muted">{Math.round(dim.value)}%</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <ChasideInteresAptitud ms={ms} dimensionTitles={sorted} />
       ) : null}
 
       {/* Interpretación */}
@@ -395,5 +378,136 @@ function GenericMethodResults({
         </Link>
       </div>
     </main>
+  );
+}
+
+/** Máximos por área del test CHASIDE (según su calificación). */
+const CHASIDE_INTERES_MAX = 10;
+const CHASIDE_APTITUD_MAX = 4;
+
+/**
+ * Extrae de forma defensiva los conteos crudos por área de Interés y Aptitud
+ * guardados en `method_scores.raw` para CHASIDE. Devuelve null si el dato no
+ * existe (filas antiguas) o no tiene la forma esperada.
+ */
+function parseChasideCounts(
+  raw: Record<string, unknown> | null | undefined
+): { interes: Record<string, number>; aptitud: Record<string, number> } | null {
+  if (!raw || typeof raw !== "object") return null;
+  const interes = raw.interes;
+  const aptitud = raw.aptitud;
+  const isCountMap = (v: unknown): v is Record<string, number> =>
+    typeof v === "object" &&
+    v !== null &&
+    !Array.isArray(v) &&
+    Object.values(v as Record<string, unknown>).every(
+      (n) => typeof n === "number"
+    );
+  if (!isCountMap(interes) || !isCountMap(aptitud)) return null;
+  return { interes, aptitud };
+}
+
+/**
+ * Panel "Interés vs. Aptitud" de CHASIDE. A diferencia de las barras
+ * combinadas por dimensión, aquí se grafican POR SEPARADO el conteo de Interés
+ * (máx. 10) y el de Aptitud (máx. 4) de cada área, que es la lectura propia del
+ * instrumento. Si no hay conteos crudos disponibles (sesiones antiguas), se
+ * muestra un aviso en lugar de repetir las barras combinadas.
+ */
+function ChasideInteresAptitud({
+  ms,
+  dimensionTitles,
+}: {
+  ms: StoredMethodScores;
+  dimensionTitles: StoredMethodScores["dimensionScores"];
+}) {
+  const counts = parseChasideCounts(ms.raw);
+  const titleByCode = new Map(
+    dimensionTitles.map((d) => [d.code, d.title] as const)
+  );
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <h2 style={{ marginTop: 0 }}>Interés vs. Aptitud</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        CHASIDE evalúa por separado tus <strong>intereses</strong> (máx. 10 por
+        área) y tus <strong>aptitudes</strong> (máx. 4 por área). Un perfil
+        alineado muestra interés y aptitud altos en las mismas áreas.
+      </p>
+
+      {!counts ? (
+        <div className="alert alert-warning" role="status">
+          No hay conteos separados de interés y aptitud disponibles para esta
+          evaluación.
+        </div>
+      ) : (
+        <div className="stack">
+          {[...dimensionTitles]
+            .map((d) => ({
+              code: d.code,
+              title: titleByCode.get(d.code) ?? d.code,
+              interes: counts.interes[d.code] ?? 0,
+              aptitud: counts.aptitud[d.code] ?? 0,
+            }))
+            .sort((a, b) => b.interes - a.interes || b.aptitud - a.aptitud)
+            .map((row) => {
+              const interesPct = Math.round(
+                (row.interes / CHASIDE_INTERES_MAX) * 100
+              );
+              const aptitudPct = Math.round(
+                (row.aptitud / CHASIDE_APTITUD_MAX) * 100
+              );
+              return (
+                <div key={`chaside-ia-${row.code}`}>
+                  <div
+                    className="row spread"
+                    style={{ marginBottom: 4, fontWeight: 600 }}
+                  >
+                    <span>
+                      {row.code} · {row.title}
+                    </span>
+                  </div>
+                  {/* Interés */}
+                  <div
+                    className="row spread"
+                    style={{ marginBottom: 2, fontSize: 13 }}
+                  >
+                    <span className="muted">Interés</span>
+                    <span className="muted">
+                      {row.interes}/{CHASIDE_INTERES_MAX}
+                    </span>
+                  </div>
+                  <div className="row" style={{ marginBottom: 8 }}>
+                    <div className="dimension-bar-track">
+                      <div
+                        className="dimension-bar-fill"
+                        style={{ width: `${interesPct}%`, background: "#4F46E5" }}
+                      />
+                    </div>
+                  </div>
+                  {/* Aptitud */}
+                  <div
+                    className="row spread"
+                    style={{ marginBottom: 2, fontSize: 13 }}
+                  >
+                    <span className="muted">Aptitud</span>
+                    <span className="muted">
+                      {row.aptitud}/{CHASIDE_APTITUD_MAX}
+                    </span>
+                  </div>
+                  <div className="row">
+                    <div className="dimension-bar-track">
+                      <div
+                        className="dimension-bar-fill"
+                        style={{ width: `${aptitudPct}%`, background: "#16A34A" }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      )}
+    </div>
   );
 }

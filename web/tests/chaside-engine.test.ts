@@ -119,4 +119,34 @@ describe("CHASIDE scoring", () => {
     expect(result.dominantCodes[0]).toBe("E");
     expect(result.interpretation).toContain("Ciencias Exactas y Orgánicas");
   });
+
+  it("exposes per-area Interés and Aptitud counts in raw for the results view", () => {
+    // Interés S=10, I=6; Aptitud S=4, I=1. Estos conteos deben poder graficarse
+    // por separado en el panel "Interés vs. Aptitud".
+    const answers: MethodAnswer[] = [
+      ...answerYes(idsFor("S", "INTERES")), // 10
+      ...answerYes(idsFor("I", "INTERES").slice(0, 6)), // 6
+      ...answerYes(idsFor("S", "APTITUD")), // 4
+      ...answerYes(idsFor("I", "APTITUD").slice(0, 1)), // 1
+    ];
+    const result = scoreChaside(answers);
+    const raw = result.raw as {
+      interes: Record<ChasideArea, number>;
+      aptitud: Record<ChasideArea, number>;
+    };
+    expect(raw.interes.S).toBe(10);
+    expect(raw.interes.I).toBe(6);
+    expect(raw.aptitud.S).toBe(4);
+    expect(raw.aptitud.I).toBe(1);
+    // Interés y Aptitud NO coinciden por área: el panel debe poder mostrar la
+    // diferencia (aquí ambos coinciden en S como top, pero difieren en conteos).
+    expect(raw.interes.C).toBe(0);
+    expect(raw.aptitud.C).toBe(0);
+
+    // El dato sobrevive la serialización JSON usada por la persistencia
+    // (method_scores JSONB) sin perder los conteos por área.
+    const roundTripped = JSON.parse(JSON.stringify(raw)) as typeof raw;
+    expect(roundTripped.interes.S).toBe(10);
+    expect(roundTripped.aptitud.S).toBe(4);
+  });
 });

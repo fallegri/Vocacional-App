@@ -174,14 +174,16 @@ export default function AssessmentClient({
     }
   };
 
-  // Etiquetas de extremos de la escala (para RIASEC/Likert-5 se mantienen las
-  // clásicas; para otras escalas se derivan de la primera/última opción).
+  // Etiquetas de extremos de la escala. Para RIASEC/Likert-5 se mantienen las
+  // clásicas. Para otras escalas, las etiquetas deben seguir el MISMO orden en
+  // que se renderizan los botones (la primera opción a la izquierda, la última
+  // a la derecha), de modo que la leyenda coincida con la posición del botón.
   const lowLabel = isRiasec
     ? "1 · Ningún interés"
-    : `${scaleOptions[scaleOptions.length - 1]?.label ?? ""}`;
+    : `${scaleOptions[0]?.label ?? ""}`;
   const highLabel = isRiasec
     ? "5 · Máximo interés"
-    : `${scaleOptions[0]?.label ?? ""}`;
+    : `${scaleOptions[scaleOptions.length - 1]?.label ?? ""}`;
 
   return (
     <div className="stack" style={{ gap: 20 }}>

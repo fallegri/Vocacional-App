@@ -129,6 +129,23 @@ export interface TutorTurn {
   content: string;
 }
 
+/**
+ * Contexto de un método vocacional distinto de RIASEC (CHASIDE, TIPOV) para el
+ * tutor. Se construye a partir de los `method_scores` reales de la sesión en
+ * lugar de un perfil RIASEC de ceros.
+ */
+export interface TutorMethodContext {
+  methodId: string;
+  /** Nombre legible del método (p. ej. "CHASIDE", "TIPOV"). */
+  methodName?: string | null;
+  dominantCode?: string | null;
+  dominantSummary?: string | null;
+  interpretation?: string | null;
+  /** Puntajes por dimensión (código, título y valor normalizado 0-100). */
+  dimensionScores?: Array<{ code: string; title: string; value: number }>;
+  studentName?: string | null;
+}
+
 export interface TutorContext {
   scores?: PsychometricScores | null;
   dominantCode?: string | null;
@@ -136,6 +153,11 @@ export interface TutorContext {
   topCareers?: CareerMatch[] | null;
   reliabilityLevel?: string | null;
   studentName?: string | null;
+  /**
+   * Contexto de un método distinto de RIASEC. Cuando está presente, el prompt
+   * usa el resultado real del método en lugar del perfil RIASEC.
+   */
+  method?: TutorMethodContext | null;
   /** Bloque opcional de fuentes de conocimiento (RAG) ya formateado. */
   knowledgeBlock?: string;
 }
@@ -149,9 +171,51 @@ export function buildTutorSystemPrompt(ctx: TutorContext): string {
   const parts: string[] = [
     "Eres OrientApp AI Tutor, un tutor y asesor vocacional experto, cercano y motivador.",
     "Respondes siempre en español, con lenguaje claro, empático y orientado a la acción, adecuado para estudiantes preuniversitarios.",
-    "Usa el perfil psicométrico RIASEC del estudiante para personalizar cada respuesta y ayúdale a explorar carreras, habilidades y decisiones vocacionales.",
+    "Usa el perfil vocacional del estudiante para personalizar cada respuesta y ayúdale a explorar carreras, habilidades y decisiones vocacionales.",
     "Sé conciso y evita respuestas excesivamente largas; ofrece pasos concretos cuando sea útil.",
   ];
+
+  if (ctx.method) {
+    // Contexto de un método distinto de RIASEC (CHASIDE, TIPOV): se usa el
+    // resultado real del método (no un perfil RIASEC de ceros).
+    const m = ctx.method;
+    const methodLabel = m.methodName?.trim() || m.methodId;
+    parts.push(
+      "",
+      `El estudiante completó el instrumento vocacional ${methodLabel}. Fundamenta tus respuestas en su resultado, sin inventar puntajes RIASEC ni carreras que no aparezcan aquí.`,
+      "",
+      `Contexto vocacional del estudiante (${methodLabel}):`
+    );
+    if (m.studentName && m.studentName.trim().length > 0) {
+      parts.push(`- Nombre: ${m.studentName.trim()}`);
+    }
+    if (m.dominantCode && m.dominantCode.trim().length > 0) {
+      parts.push(`- Áreas/dimensiones dominantes: ${m.dominantCode}`);
+    }
+    if (m.dominantSummary && m.dominantSummary.trim().length > 0) {
+      parts.push(`- Perfil dominante: ${m.dominantSummary}`);
+    }
+    if (m.dimensionScores && m.dimensionScores.length > 0) {
+      const topDims = [...m.dimensionScores]
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 6)
+        .map((d) => `  * ${d.code} (${d.title}): ${Math.trunc(d.value)}%`)
+        .join("\n");
+      parts.push("- Puntajes por dimensión (0-100, mayores primero):", topDims);
+    }
+    if (m.interpretation && m.interpretation.trim().length > 0) {
+      parts.push(`- Interpretación: ${m.interpretation.trim()}`);
+    }
+
+    if (ctx.knowledgeBlock && ctx.knowledgeBlock.trim().length > 0) {
+      parts.push("", ctx.knowledgeBlock);
+    }
+    return parts.join("\n");
+  }
+
+  parts.push(
+    "Usa el perfil psicométrico RIASEC del estudiante cuando esté disponible."
+  );
 
   if (ctx.dominantCode && ctx.scores) {
     parts.push("", "Contexto psicométrico del estudiante:");
