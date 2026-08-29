@@ -1,11 +1,48 @@
 "use server";
 
 import { query } from "@/lib/db";
+import { DEFAULT_COHORTS } from "@/data/seed";
+import type { CohortGroup } from "@/lib/riasec/types";
 
 export interface CreateCohortResult {
   ok: boolean;
   code?: string;
   error?: string;
+}
+
+/**
+ * Lista los grupos/cohortes. Combina las cohortes almacenadas en Neon con las
+ * cohortes semilla (DEFAULT_COHORTS), evitando duplicados por código. Si no hay
+ * base de datos activa devuelve solo las cohortes semilla, de forma que la app
+ * siga funcionando (y el build pase) sin DATABASE_URL.
+ */
+export async function listCohorts(): Promise<CohortGroup[]> {
+  const seed: CohortGroup[] = DEFAULT_COHORTS.map((c) => ({ ...c }));
+
+  let dbCohorts: CohortGroup[] = [];
+  try {
+    const rows = await query(
+      `SELECT code, title, institution, creator_name, is_active, description
+         FROM cohort_groups
+        ORDER BY created_at DESC`
+    );
+    dbCohorts = rows.map((row) => ({
+      code: String(row.code),
+      title: String(row.title ?? ""),
+      institution: String(row.institution ?? ""),
+      creatorName: String(row.creator_name ?? ""),
+      isActive: row.is_active == null ? true : Boolean(row.is_active),
+      description: String(row.description ?? ""),
+    }));
+  } catch {
+    // Sin DB activa: solo devolvemos las cohortes semilla.
+    dbCohorts = [];
+  }
+
+  const byCode = new Map<string, CohortGroup>();
+  for (const c of seed) byCode.set(c.code, c);
+  for (const c of dbCohorts) byCode.set(c.code, c); // la DB tiene prioridad
+  return Array.from(byCode.values());
 }
 
 /**

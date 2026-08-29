@@ -1,18 +1,31 @@
 import AdminClient from "@/components/AdminClient";
+import { listCohorts } from "@/lib/actions/cohorts";
+import { listSessions } from "@/lib/sessions";
+
+// Fuerza el renderizado dinámico: los datos de Neon se leen solo en tiempo de
+// ejecución, nunca durante `next build`. Las funciones de carga están además
+// protegidas para devolver datos semilla / vacíos si no hay DATABASE_URL.
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export const metadata = {
   title: "Administración | OrientApp",
 };
 
-export default function AdminPage() {
+export default async function AdminPage() {
+  const [cohorts, sessions] = await Promise.all([
+    listCohorts(),
+    listSessions(),
+  ]);
+
   return (
     <main className="container container-wide">
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ marginBottom: 4 }}>Administración de Grupos</h1>
+        <h1 style={{ marginBottom: 4 }}>Panel de Administración</h1>
         <p className="muted" style={{ marginTop: 0 }}>
-          Crea grupos de encuesta y comparte el código QR que lleva al test
-          vocacional asignado a cada grupo. Cada QR abre la evaluación con el
-          código de cohorte ya aplicado.
+          Audita evaluaciones, gestiona grupos de encuesta con sus códigos QR y
+          consulta el directorio de usuarios. Cada QR abre el test vocacional
+          con el código de cohorte ya aplicado.
         </p>
         <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 8 }}>
           <a className="btn btn-secondary" href="/admin/knowledge">
@@ -23,7 +36,7 @@ export default function AdminPage() {
           </a>
         </div>
       </div>
-      <AdminClient />
+      <AdminClient initialCohorts={cohorts} initialSessions={sessions} />
     </main>
   );
 }

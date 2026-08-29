@@ -109,6 +109,90 @@ export async function persistSession(input: PersistSessionInput): Promise<void> 
   }
 }
 
+export interface SessionSummary {
+  id: string;
+  startedAt: number;
+  completedAt: number | null;
+  isValid: boolean;
+  reliabilityLevel: string;
+  scores: PsychometricScores;
+  dominantCode: string;
+  topCareerTitle: string | null;
+  cohortCode: string | null;
+  studentName: string | null;
+  studentEmail: string | null;
+  reviewerNotes: string | null;
+  reviewStatus: string | null;
+}
+
+/**
+ * Lista las sesiones de evaluación para el panel de administración.
+ * Solo runtime. Si no hay DATABASE_URL o la consulta falla, devuelve [] para
+ * que el panel funcione (y el build pase) sin base de datos activa.
+ */
+export async function listSessions(): Promise<SessionSummary[]> {
+  let rows: Record<string, unknown>[] = [];
+  try {
+    rows = await query(
+      `SELECT id, started_at, completed_at, is_valid, reliability_level,
+              r_score, i_score, a_score, s_score, e_score, c_score,
+              dominant_code, top_career_title,
+              cohort_code, student_name, student_email,
+              reviewer_notes, review_status
+         FROM assessment_sessions
+        ORDER BY COALESCE(completed_at, started_at) DESC
+        LIMIT 500`
+    );
+  } catch {
+    return [];
+  }
+
+  const num = (v: unknown): number => Number(v ?? 0);
+  const str = (v: unknown): string | null => (v == null ? null : String(v));
+
+  return rows.map((row) => ({
+    id: String(row.id),
+    startedAt: num(row.started_at),
+    completedAt: row.completed_at == null ? null : num(row.completed_at),
+    isValid: Boolean(row.is_valid),
+    reliabilityLevel: String(row.reliability_level ?? ""),
+    scores: {
+      r: num(row.r_score),
+      i: num(row.i_score),
+      a: num(row.a_score),
+      s: num(row.s_score),
+      e: num(row.e_score),
+      c: num(row.c_score),
+    },
+    dominantCode: String(row.dominant_code ?? ""),
+    topCareerTitle: str(row.top_career_title),
+    cohortCode: str(row.cohort_code),
+    studentName: str(row.student_name),
+    studentEmail: str(row.student_email),
+    reviewerNotes: str(row.reviewer_notes),
+    reviewStatus: str(row.review_status),
+  }));
+}
+
+/**
+ * Guarda el dictamen del revisor (notas + estado de revisión) sobre una sesión.
+ * Solo runtime. Devuelve el número de filas afectadas (0 si la sesión no existe).
+ */
+export async function updateSessionReview(
+  sessionId: string,
+  reviewerNotes: string,
+  reviewStatus: string
+): Promise<number> {
+  const rows = await query(
+    `UPDATE assessment_sessions
+        SET reviewer_notes = $2, review_status = $3
+      WHERE id = $1
+      RETURNING id`,
+    [sessionId, reviewerNotes, reviewStatus]
+  );
+  return rows.length;
+}
+
 /** Carga una sesión por id. Devuelve null si no existe. Solo runtime. */
 export async function loadSession(
   sessionId: string
