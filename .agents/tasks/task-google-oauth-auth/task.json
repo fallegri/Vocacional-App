@@ -1,0 +1,7 @@
+{
+  "task_id": "task-google-oauth-auth",
+  "task_description": "Add real Google OAuth sign-in (Auth.js v5 / next-auth@beta with the Google provider) to the OrientApp Next.js web app under web/, with role-based authorization (SUPER_ADMIN/TEST_ADMIN/REPORT_REVIEWER/STUDENT) that supersedes the interim STAFF_ACCESS_TOKEN shared-token barrier. Protect the four staff mutation entry points (createCohort, saveAiConfig, POST /api/knowledge, PATCH /api/sessions/[id]/review) and the /admin/* pages with real session+role checks, wire Google sign-in/sign-out UI, link/create Google users in app_users on first login, and document setup. Preserve the invariant that `next build` succeeds with NO env vars set and the lazy DB access pattern. Work stays on branch feat/web-migration-vercel-neon; no push/PR.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}

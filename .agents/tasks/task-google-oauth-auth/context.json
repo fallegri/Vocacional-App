@@ -1,0 +1,32 @@
+{
+  "project_type": "Next.js 15 (App Router) + TypeScript web app under web/ (migrated from a native Android RIASEC vocational-diagnostic app under app/). Deployed on Vercel + Neon Postgres.",
+  "language": "TypeScript (React 19, Next.js 15.1)",
+  "build_system": "npm in web/ (package-lock.json present). Node 22. All commands run from web/.",
+  "test_framework": "Vitest (node environment). Config web/vitest.config.ts includes tests/**/*.test.ts with @ alias to web/ root. 48 tests currently pass across 5 files.",
+  "build_command": "npm run build (run from web/) — MUST succeed with NO env vars set.",
+  "test_command": "npm run test -- --run (from web/)",
+  "verification_instructions": "From web/: npm run typecheck && npm run lint && npm run test -- --run && npm run build. All four must pass. The build MUST pass with NO environment variables defined (no DATABASE_URL, no GOOGLE_* secrets, no AUTH_SECRET). Verify by running the build in a clean shell without exporting any env vars.",
+  "snapshot_or_generated_files": "None. tsconfig.tsbuildinfo and .next/ are build artifacts (gitignored / regenerated).",
+  "setup_instructions": "Dependencies already installed in web/node_modules. To add the auth library: from web/, run `npm install next-auth@beta` (OPEN_INTERNET allows registry access). This updates package.json and package-lock.json which must be committed.",
+  "environment_constraints": "Network mode OPEN_INTERNET (registry installs allowed). CRITICAL build-safety invariant: `next build` must NOT require any env var. The existing lazy-DB pattern in web/lib/db.ts (Pool created only on first query, DATABASE_URL read at request time) must be preserved. Google OAuth secrets (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, AUTH_SECRET, optionally AUTH_URL/NEXTAUTH_URL) must be read lazily/at request time and their ABSENCE must NOT break build or typecheck — auth simply reports an 'auth no configurado' state at runtime.",
+  "contribution_requirements": "All user-facing text stays in SPANISH (entire UI is Spanish). Do NOT touch the Android sources under app/ (only web/ changes). Work stays on branch feat/web-migration-vercel-neon; do NOT push or create/modify PRs (orchestrator handles that). Do NOT re-clone or switch branches.",
+  "key_patterns": "Server actions live in web/lib/actions/*.ts with 'use server'. Route handlers in web/app/api/**/route.ts with `export const dynamic='force-dynamic'` and `export const runtime='nodejs'`. DB access via query()/withTransaction() from web/lib/db.ts (lazy). Roles defined in web/lib/riasec/types.ts (UserRoleCode: SUPER_ADMIN | TEST_ADMIN | REPORT_REVIEWER | STUDENT; USER_ROLES[x].isStaff distinguishes staff vs student). Seed users in web/data/seed.ts (DEFAULT_USERS, each with email/role). app_users table exists in web/db/schema.sql (id,email,display_name,role,cohort_code,auth_provider,institution). Current staff guard: web/lib/auth/staff.ts exports authorizeStaff, authorizeStaffRequest, getStaffTokenFromRequest, isStaffAuthEnabled, STAFF_TOKEN_HEADER.",
+  "relevant_files": [
+    "web/lib/auth/staff.ts (current shared-token guard to supersede)",
+    "web/tests/staff-auth.test.ts (test suite to adapt to role-based model)",
+    "web/lib/actions/cohorts.ts (createCohort — staff mutation to protect)",
+    "web/lib/actions/ai-config.ts (saveAiConfig — staff mutation to protect)",
+    "web/app/api/knowledge/route.ts (POST — staff mutation to protect)",
+    "web/app/api/sessions/[id]/review/route.ts (PATCH — staff mutation to protect)",
+    "web/app/admin/page.tsx, web/app/admin/knowledge/page.tsx, web/app/admin/ai-settings/page.tsx (pages to protect)",
+    "web/components/AdminClient.tsx (has demo role selector + StaffTokenField wiring)",
+    "web/components/KnowledgeAdminClient.tsx, web/components/AiSettingsClient.tsx (StaffTokenField wiring)",
+    "web/components/StaffTokenField.tsx, web/components/useStaffToken.ts (sessionStorage token flow to deprecate/remove in UI)",
+    "web/lib/riasec/types.ts (roles model)",
+    "web/data/seed.ts (DEFAULT_USERS with roles/emails)",
+    "web/lib/db.ts (lazy Pool pattern to preserve)",
+    "web/app/layout.tsx (topbar nav — where sign-in/out UI belongs)",
+    "web/.env.example, web/README.md (env docs + auth section lines 34-60)"
+  ],
+  "directory_structure": "web/app (App Router routes + api route handlers), web/components (client components), web/lib (actions/, auth/, ai/, knowledge/, riasec/, db.ts), web/data (seed.ts), web/db (schema.sql), web/scripts (seed.ts), web/tests (Vitest). Original Android app under app/ (do not touch)."
+}
