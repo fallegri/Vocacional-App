@@ -1,0 +1,14 @@
+{
+  "task_id": "task-orientapp-web-migration",
+  "task_description": "Migrate the OrientApp native Android (Kotlin/Compose/Room) vocational-diagnostic app to a Next.js + TypeScript web app deployed on Vercel + Neon Postgres. Faithfully port the RIASEC psychometric engine, 60-question assessment, radar results, career matching, and OpenAI-compatible AI advisor. Add (1) a RAG knowledge base grounded in staff-uploaded documents (books/research) using Neon pgvector with citations, and (2) automatic QR-code generation when a new survey group (cohort) is created, linking to the cohort-scoped test form. Original Android sources under app/ are preserved; the web app lives under web/.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "From web/ with NO env vars set: `npm run typecheck` clean, `npm run lint` clean, `npm run test -- --run` 48/48 pass across engine/qr/knowledge/ai-client/staff-auth suites (review-fix pass added embedTexts ordering + staff-auth tests), `npm run build` succeeds (DB/AI routes correctly rendered dynamic, no DB/secret access at build time). Test quality reviewed: engine.test.ts exercises the real scoring math (mixed-answer 75% formula, mirror-pair +20/+10 penalty and [40,100] clamp, career sort/clamp[30,99]/Spanish matchLevel thresholds, dominant-dimension boost, exact Spanish profile strings) and would fail if the formulas were reverted; qr.test.ts covers the cohort URL/base-url helpers; knowledge.test.ts covers the RAG chunker/guards. No Dockerfile in web/, so docker build skipped. Runtime DB/AI/pgvector behavior could not be exercised (no live Neon/OpenAI credentials in the sandbox)."
+  }
+}

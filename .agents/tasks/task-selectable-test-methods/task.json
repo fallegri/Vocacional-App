@@ -1,0 +1,14 @@
+{
+  "task_id": "task-selectable-test-methods",
+  "task_description": "Let the user choose which vocational-test method to take: the app's existing RIASEC method (default) or a method from the uploaded docs. Introduce a pluggable method registry, implement CHASIDE and TIPOV as new fully-interactive self-scored instruments (with faithful item banks and correct scale/scoring/interpretation), keep RIASEC unchanged, persist which method a session used, support per-user choice and per-cohort assignment (QR carries the method), and document everything in Spanish. All work on branch feat/web-migration-vercel-neon; do not push.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "From web/: typecheck OK, lint OK (no warnings), Vitest 110/110 pass across 10 files (up from 81 baseline; RIASEC engine.test.ts 20 tests unchanged and green), and `next build` succeeds with NO env vars set (invariant preserved). Test quality reviewed: chaside-engine.test.ts and tipov-engine.test.ts assert real scoring math (per-area 'Sí' counting split by Interés/Aptitud, two-highest-per-dimension selection, per-dimension raw sums, normalization formulas, all-min/all-max extremes, dominant-area interpretation text) and would fail if the scoring were reverted — not stubs. No Dockerfile in web/, so docker build is not applicable."
+  }
+}

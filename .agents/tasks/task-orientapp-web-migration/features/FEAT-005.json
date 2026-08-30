@@ -1,0 +1,29 @@
+{
+  "id": "FEAT-005",
+  "type": "docs",
+  "description": "Add Vercel deployment configuration, Neon setup instructions, a database seeding script, and a comprehensive README so the migrated web app can be deployed to Vercel + Neon. Finalize env-var documentation (including AI/embeddings and pgvector). Depends on FEAT-001..FEAT-004.",
+  "status": "completed",
+  "steps": [
+    "Add web/README.md documenting: project overview (OrientApp web migration), local dev (npm install, npm run dev), the full list of env vars with descriptions (DATABASE_URL for Neon; AI_BASE_URL / AI_API_KEY / AI_MODEL / AI_EMBEDDING_MODEL for the OpenAI-compatible advisor + embeddings; NEXT_PUBLIC_APP_URL for QR base URL), how to provision a Neon database and enable pgvector, how to apply web/db/schema.sql, how to seed the DB, and step-by-step Vercel deploy (import repo, set root directory to web/, set env vars in Vercel project settings, deploy).",
+    "Add a DB seeding script web/scripts/seed.ts (runnable via an npm script like `npm run db:seed`) that applies web/db/schema.sql if needed and inserts the default cohorts, users, and (optionally) AI config from web/data/seed.ts into Neon using web/lib/db.ts. It must read DATABASE_URL at runtime and no-op/exit with a clear message if unset (so it never runs during build).",
+    "Add vercel.json if needed (or document that Vercel auto-detects Next.js with root directory web/). Ensure the AI/DB routes use the Node.js runtime where the Neon serverless driver or embeddings need it; document any runtime settings.",
+    "Update the repo root README (create web/ pointer or a short note in an existing doc) so a reader knows the Android app under app/ is preserved and the deployable web app is under web/. Do not delete or modify app/ sources.",
+    "Confirm web/.env.example lists every env var referenced anywhere in web/ (grep for process.env) with a placeholder and comment, and that no real secrets are committed.",
+    "Run the full verification suite and fix any remaining typecheck/lint/build issues."
+  ],
+  "acceptance_criteria": [
+    "web/README.md documents Neon provisioning + pgvector, applying schema.sql, seeding, and Vercel deploy steps (root dir web/, env vars).",
+    "web/.env.example lists every process.env var used in web/ with placeholders; no real secrets committed.",
+    "web/scripts/seed.ts exists, is wired to an npm script, and exits cleanly with a clear message when DATABASE_URL is unset.",
+    "`cd web && npm run build`, `npm run typecheck`, `npm run lint`, and `npm run test -- --run` all pass."
+  ],
+  "verification": [
+    "cd web && npm run typecheck",
+    "cd web && npm run lint",
+    "cd web && npm run test -- --run",
+    "cd web && npm run build",
+    "cd web && grep -rEo 'process\\.env\\.[A-Z_]+' app lib scripts | sort -u"
+  ],
+  "blocked_reason": null,
+  "findings": "Completed deployment docs + seed script. NEW FILES: web/README.md (project overview Android app/ preserved vs deployable web/; local dev; FULL env-var table with descriptions for DATABASE_URL, NEXT_PUBLIC_APP_URL, AI_PROVIDER_TYPE, AI_BASE_URL, AI_API_KEY, AI_MODEL, AI_EMBEDDING_MODEL (embedding dim 1536), AI_TEMPERATURE, AI_MAX_TOKENS; Neon provisioning + CREATE EXTENSION vector; how to apply web/db/schema.sql (via seed or psql/SQL editor); how to seed; step-by-step Vercel deploy with Root Directory=web + env vars + post-deploy seed; documents that auth is a seed-user/role selector with NO real OAuth yet; documents RAG needs embeddings-capable provider dim 1536; runtime notes for nodejs + force-dynamic routes). web/scripts/seed.ts (runnable via `npm run db:seed`): reads DATABASE_URL at RUNTIME, exits 1 with a clear Spanish message if unset (never touches DB during build), applies web/db/schema.sql statement-by-statement (custom splitter that respects single-quoted blocks and -- comments; all schema stmts are IF NOT EXISTS = idempotent), then inserts DEFAULT_COHORTS + DEFAULT_USERS with ON CONFLICT DO NOTHING (re-runnable). Auto-loads web/.env.local via `tsx --env-file-if-exists=.env.local`. Root /README.md (pointer: app/ = preserved Android app, web/ = deployable web app; highlights RAG + QR additions; links web/README.md + SDD). web/vercel.json (framework nextjs + build/install commands; Root Directory=web set in Vercel UI as documented). CHANGED: package.json +devDependency tsx + script db:seed. IMPORTANT FIX in web/lib/db.ts: the existing query(text,params) helper cast the neon() HTTP function and called .query() on it, but @neondatabase/serverless@0.10.4's neon() function does NOT expose a .query method (verified: only `transaction`), so parameterized queries would fail at RUNTIME against real Neon (build/tests never hit DB so it was latent). Reworked query() to lazily use a Pool ({connectionString}) whose .query(text, params) returns result.rows; the tagged-template `sql` export is unchanged. This makes the seed script AND all prior runtime DB code (cohorts, sessions, ai-config, knowledge) actually work against Neon. web/.env.example already listed every env var (no change needed); confirmed all 9 grep-found vars present, no secrets. VERIFICATION (from web/): npm run typecheck OK; npm run lint clean; npm run test -- --run 39 tests pass (3 files); npm run build succeeds with NO env vars (DATABASE_URL/AI_API_KEY unset) - DB/AI routes render dynamic (ƒ); seed.ts exits 1 with Spanish message when DATABASE_URL unset and progresses to the network/query stage with a set DATABASE_URL. Node 22 (v22.23.2) supports --env-file-if-exists."
+}

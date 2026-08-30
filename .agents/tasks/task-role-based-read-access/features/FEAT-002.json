@@ -1,0 +1,22 @@
+{
+  "id": "FEAT-002",
+  "type": "docs",
+  "description": "Update web/README.md (Spanish) to document the full role -> permission matrix now that READ paths are gated, including student ownership rules for results/sessions and the behavior of demo/unconfigured-auth mode. Depends on FEAT-001.",
+  "status": "completed",
+  "steps": [
+    "In web/README.md, add or extend the authorization/roles section (keep Spanish). Add a role -> permission matrix table covering STUDENT, REPORT_REVIEWER, TEST_ADMIN, SUPER_ADMIN across: tomar test / entrar por /g/{code}; ver resultados propios (/results/{id}); ver resultados de otros; informe IA y tutor sobre una sesión; listar documentos de conocimiento (GET /api/knowledge); subir documentos (POST /api/knowledge); panel /admin (evaluaciones, cohortes, usuarios); dictamen del revisor (PATCH /api/sessions/{id}/review); crear cohortes / guardar config IA.",
+    "Document HOW student ownership is determined and enforced: the session's student_email is set from the authenticated user's email at creation (POST /api/sessions overrides client value when signed in); a STUDENT may read only sessions whose student_email matches their email (case-insensitive); staff may read any; sessions with null student_email are staff-only.",
+    "Document DEMO / unconfigured-auth mode (isAuthConfigured() === false): OAuth provider is inactive, reads remain OPEN so `next build` with no env vars and local demos keep working; the legacy STAFF_ACCESS_TOKEN still gates mutations as a fallback. Note this is a deliberate degrade, not the production posture.",
+    "Note the behavior change vs the prior step: GET /api/knowledge and /results are now gated; previously they were open."
+  ],
+  "acceptance_criteria": [
+    "web/README.md contains a Spanish role -> permission matrix table covering the endpoints/pages listed above.",
+    "README documents student ownership determination/enforcement and demo-mode read behavior, and notes the behavior change.",
+    "npm run build still passes (docs-only change does not break build)."
+  ],
+  "verification": [
+    "cd web && npm run build"
+  ],
+  "blocked_reason": null,
+  "findings": "Docs-only. Extended web/README.md 'Autenticación y autorización' section (Spanish) with: (1) a role->permission matrix table (STUDENT/REPORT_REVIEWER/TEST_ADMIN/SUPER_ADMIN) covering take-test/g-code, ver resultados propios/de otros, IA sobre sesión vs chat general, GET/POST /api/knowledge, /admin, PATCH review, crear cohortes/guardar config IA; (2) 'Propiedad de la sesión del estudiante' documenting student_email is set from the authenticated email at POST /api/sessions (client value overridden when signed in), case-insensitive owner match, staff-any, null student_email = staff-only, AccessRestricted/403 for non-owner; (3) 'Modo demo / autenticación no configurada' explaining reads stay OPEN when isAuthConfigured() is false (deliberate degrade for no-env build/local demos, STAFF_ACCESS_TOKEN still gates mutations); (4) 'Cambio de comportamiento' noting GET /api/knowledge and /results are now gated where previously open. Verified: npm run build passes with no env (exit 0)."
+}

@@ -1,0 +1,14 @@
+{
+  "task_id": "task-knowledge-ingest-and-two-methods",
+  "task_description": "Two approved follow-ups on branch feat/web-migration-vercel-neon (extends open PR #1): PART A — add a repeatable, idempotent RAG ingestion script that loads the uploaded skills/knowledge/*.md docs into the Neon pgvector knowledge base via the existing ingestDocument() pipeline, degrading cleanly when DATABASE_URL/AI are unset and never running during build. PART B — implement CIP-R (114 items, Agrado/Indiferencia/Desagrado, 15 interest scales) and Test Magdalena Contreras/Lizarazo (dual Interés+Aptitud, 10 campos x 6 x 2 = 120 items, 0-4 scale, interpretation bands) as fully interactive self-scored methods in the existing pluggable registry, flowing through the /assessment selector and per-cohort QR flow. Keep all user-facing text in Spanish and preserve the no-env build invariant.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "From web/ (Node 22 via nvm): npm run typecheck clean; npm run lint 'No ESLint warnings or errors'; npx vitest --run 155 passed (115 baseline + 40 new across knowledge-sources, cipr-engine, magdalena-engine and updated method-registry); env -u DATABASE_URL -u AI_API_KEY npm run build succeeds (no-env invariant preserved). Test quality verified by reading the new engine suites: magdalena-engine asserts real per-field Interés/Aptitud sums (max 24), band boundaries (6/7, 12/13, 18/19), Interés-vs-Aptitud mismatch logic, and JSON round-trip; cipr-engine asserts 114-item bank across 15 scales, documented Agrado/Indiferencia/Desagrado value mapping, per-scale sums and dominant ordering; knowledge-sources asserts the pure filename->document mapping. These would fail if the implementation were reverted. No Dockerfile-based build path was used (host verification only); live RAG ingestion could not be executed in-sandbox (no Neon/OpenAI credentials) as expected."
+  }
+}
