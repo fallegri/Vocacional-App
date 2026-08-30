@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "refactor",
   "description": "Confirm green baseline, then REMOVE the RAG/AI machinery so the vocational analysis is produced ENTIRELY by the deterministic method engines (no LLM, no retrieval, no embeddings). Delete the AI advisor/report, the Tutor chat, the knowledge base (pgvector) ingestion+retrieval+embeddings, the AI config, and all their routes/UI/tests/schema. Keep the 5 deterministic method engines (RIASEC/CHASIDE/TIPOV/CIP-R/Magdalena) and their tests fully intact and green. The bibliography files at repo-root skills/knowledge/*.md STAY (they document the methods and are the source of the interpretation text). This feature is a prerequisite for FEAT-002 (auth) and FEAT-003 (groups+email).",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Setup: export NVM_DIR=\"$HOME/.nvm\"; . \"$NVM_DIR/nvm.sh\"; nvm use 22; cd web; npm install. Confirm green baseline: npm run typecheck, npm run lint, npm run test -- --run (155 tests), and no-env build (env -u DATABASE_URL -u AUTH_SECRET -u GOOGLE_CLIENT_ID npm run build).",
     "Delete AI modules: web/lib/ai/client.ts, web/lib/ai/config.ts, web/lib/ai/prompts.ts, web/lib/actions/ai-config.ts.",
@@ -37,5 +37,5 @@
     "ls skills/knowledge (bibliography .md files still present)"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Removed all RAG/AI machinery cleanly. 30 files deleted (lib/ai/*, lib/knowledge/*, scripts/ingest-knowledge.ts, app/api/ai/*, app/api/knowledge/route.ts, app/admin/ai-settings/, app/admin/knowledge/, app/tutor/, components/AiReport|AiSettings|KnowledgeAdmin|TutorChat.tsx, lib/actions/ai-config.ts, 4 AI test files). 6 files updated (layout.tsx removed Tutor IA nav link + updated metadata description, results/[sessionId]/page.tsx removed AiReportClient + both Tutor IA links, lib/sessions.ts removed aiAnalysis field + ai_analysis from SELECT, lib/riasec/types.ts removed AI wording from role descriptions, db/schema.sql removed pgvector extension + ai_config + ai_analysis + knowledge_documents/chunks + RAG indexes, package.json removed knowledge:ingest script). read-access-routes.test.ts pruned from 7 tests to 1 (kept /results read-access guard test, removed /api/ai and /api/knowledge route tests that no longer exist). Verification: typecheck OK, lint OK, 117 tests green (155 baseline minus 32 deleted AI tests minus 6 pruned read-access-routes tests), no-env build OK. Bibliography files in skills/knowledge/*.md untouched. Method engines (RIASEC/CHASIDE/TIPOV/CIP-R/Magdalena) and all their tests intact."
 }
