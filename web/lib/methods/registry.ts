@@ -29,6 +29,12 @@ import {
   CIPR_QUESTIONS,
 } from "@/lib/methods/cipr/data";
 import { scoreCipr } from "@/lib/methods/cipr/engine";
+import {
+  MAGDALENA_DIMENSIONS,
+  MAGDALENA_FIELDS,
+  MAGDALENA_QUESTIONS,
+} from "@/lib/methods/magdalena/data";
+import { scoreMagdalena } from "@/lib/methods/magdalena/engine";
 
 const CHASIDE_SCALE: ResponseScale = {
   kind: "DICHOTOMOUS",
@@ -84,6 +90,22 @@ const TIPOV_METHOD: VocationalMethod = {
   score: scoreTipov,
 };
 
+// Escala 0-4 (5 opciones) usada por el Test Magdalena Contreras. Se ordena de
+// mayor a menor para que la leyenda izquierda/derecha del AssessmentClient
+// muestre el extremo alto y el bajo de forma consistente. Las etiquetas usan la
+// redacción de INTERÉS como primaria; la vista de resultados distingue
+// Interés vs. Aptitud.
+const MAGDALENA_SCALE: ResponseScale = {
+  kind: "LIKERT_0_4",
+  options: [
+    { value: 0, label: "Me desagrada mucho" },
+    { value: 1, label: "Me desagrada algo" },
+    { value: 2, label: "Me es indiferente" },
+    { value: 3, label: "Me gusta algo" },
+    { value: 4, label: "Me gusta mucho" },
+  ],
+};
+
 const CIPR_METHOD: VocationalMethod = {
   id: "CIPR",
   name: "CIP-R",
@@ -97,6 +119,19 @@ const CIPR_METHOD: VocationalMethod = {
   score: scoreCipr,
 };
 
+const MAGDALENA_METHOD: VocationalMethod = {
+  id: "MAGDALENA",
+  name: "Test Magdalena Contreras",
+  shortDescription:
+    "Instrumento de doble medición que evalúa por separado el Interés y la Aptitud autopercibida en 10 campos de trabajo, mediante dos cuestionarios paralelos con escala 0-4.",
+  origin:
+    "Test de Orientación Vocacional de la Alcaldía La Magdalena Contreras (Ciudad de México, 2021), adaptado por Lizarazo (2024, UNICISO); evalúa Interés y Aptitud sobre 10 campos con bandas de interpretación.",
+  dimensions: MAGDALENA_FIELDS.map((field) => MAGDALENA_DIMENSIONS[field]),
+  questions: MAGDALENA_QUESTIONS,
+  scale: MAGDALENA_SCALE,
+  score: scoreMagdalena,
+};
+
 /** Método por defecto de la aplicación. */
 export const DEFAULT_METHOD_ID: MethodId = "RIASEC";
 
@@ -106,6 +141,7 @@ export const METHODS: Record<MethodId, VocationalMethod> = {
   CHASIDE: CHASIDE_METHOD,
   TIPOV: TIPOV_METHOD,
   CIPR: CIPR_METHOD,
+  MAGDALENA: MAGDALENA_METHOD,
 };
 
 /** Devuelve el método por su identificador. */
@@ -129,7 +165,8 @@ export function normalizeMethodId(value: unknown): MethodId {
       upper === "RIASEC" ||
       upper === "CHASIDE" ||
       upper === "TIPOV" ||
-      upper === "CIPR"
+      upper === "CIPR" ||
+      upper === "MAGDALENA"
     ) {
       return upper as MethodId;
     }

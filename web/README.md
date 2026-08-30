@@ -43,8 +43,9 @@ defecto** y su comportamiento, puntajes y vista de resultados no cambian.
 | **CHASIDE**|  98   | Dicotómica: **Sí** (1) / **No** (0)                      | Conteo de "Sí" por área (7 áreas C, H, A, S, I, D, E), separando **Interés** (máx. 10) y **Aptitud** (máx. 4). | Dos áreas de mayor interés + alineación **Interés-vs-Aptitud**.                |
 | **TIPOV**  |  66   | Likert-3: **Me agrada** (3) / **Me es indiferente** (2) / **Me desagrada** (1) | Suma cruda por dimensión (13 dimensiones de interés) y valor normalizado 0–100.              | Dimensiones de interés dominantes.                                             |
 | **CIP-R**  |  114  | Opción única: **Agrado** (2) / **Indiferencia** (1) / **Desagrado** (0)        | Suma cruda por escala (agregación sobre 15 escalas primarias de interés) y valor normalizado 0–100. | Escalas de interés dominantes + barras por dimensión.                          |
+| **Test Magdalena Contreras** | 120 | Escala 0–4 (**Me gusta mucho** (4) … **Me desagrada mucho** (0)) en dos cuestionarios paralelos | 60 ítems de **Interés** + 60 de **Aptitud** sobre **10 campos × 6**; suma por campo separando Interés y Aptitud (**máx. 24** por dimensión), con **bandas** de interpretación (0–6, 7–12, 13–18, 19–24). | Campos de mayor interés + bandas + comparación **Interés-vs-Aptitud** (como CHASIDE). |
 
-> Los bancos de ítems de CHASIDE, TIPOV y CIP-R son **adaptaciones originales y
+> Los bancos de ítems de CHASIDE, TIPOV, CIP-R y el Test Magdalena Contreras son **adaptaciones originales y
 > fieles** a la estructura y puntuación descritas en la documentación de cada
 > método (los documentos aportan la estructura/calificación, no la redacción
 > textual).
@@ -99,14 +100,13 @@ conocimiento.
 - **CHASIDE** (`skills/knowledge/metodo-chaside.md`).
 - **TIPOV** (`skills/knowledge/test-tipov.md`).
 - **CIP-R** (`skills/knowledge/cuestionario-cip-r.md`).
+- **Test Magdalena Contreras / Lizarazo**
+  (`skills/knowledge/test-magdalena-contreras.md`): doble medición Interés +
+  Aptitud sobre 10 campos de trabajo, con bandas de interpretación.
 
 **De referencia / base de conocimiento** (no implementados como tests
 interactivos en esta etapa), con el motivo:
 
-- **Test Magdalena Contreras / Lizarazo**
-  (`skills/knowledge/test-magdalena-contreras.md`): es un cuestionario
-  autoaplicado **implementable**, pero **no incluido en esta etapa** (posible
-  trabajo futuro).
 - **Instrumento de Autoorientación**
   (`skills/knowledge/instrumento-autoorientacion.md`): es un **marco compuesto /
   triangular** (CIP II + DAT + IHE), no un cuestionario de un solo puntaje

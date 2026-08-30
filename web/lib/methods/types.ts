@@ -7,7 +7,7 @@
 // ===========================================================================
 
 /** Identificadores de los métodos vocacionales disponibles. */
-export type MethodId = "RIASEC" | "CHASIDE" | "TIPOV" | "CIPR";
+export type MethodId = "RIASEC" | "CHASIDE" | "TIPOV" | "CIPR" | "MAGDALENA";
 
 /** Una dimensión (o escala/área) de un método vocacional. */
 export interface MethodDimension {
@@ -39,7 +39,7 @@ export interface MethodQuestion {
 
 /** Descriptor de la escala de respuesta del instrumento. */
 export interface ResponseScale {
-  kind: "LIKERT_5" | "LIKERT_3" | "DICHOTOMOUS";
+  kind: "LIKERT_5" | "LIKERT_3" | "LIKERT_0_4" | "DICHOTOMOUS";
   options: Array<{ value: number; label: string }>;
 }
 

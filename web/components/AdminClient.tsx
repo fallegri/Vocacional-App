@@ -23,6 +23,7 @@ const METHOD_OPTIONS: Array<{ id: MethodId; name: string }> = [
   { id: "CHASIDE", name: "CHASIDE" },
   { id: "TIPOV", name: "TIPOV" },
   { id: "CIPR", name: "CIP-R" },
+  { id: "MAGDALENA", name: "Test Magdalena Contreras" },
 ];
 
 const REVIEW_STATUS_CODES = Object.keys(REVIEW_STATUS) as ReviewStatusCode[];

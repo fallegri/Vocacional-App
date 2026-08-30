@@ -251,9 +251,10 @@ export default async function ResultsPage({
 
 /**
  * Vista de resultados genérica para métodos distintos de RIASEC (CHASIDE,
- * TIPOV). Se construye desde method_scores: barras por dimensión, áreas
- * dominantes e interpretación. Para CHASIDE muestra la comparación
- * Interés-vs-Aptitud usando los conteos crudos por área.
+ * TIPOV, CIP-R, Magdalena Contreras). Se construye desde method_scores: barras
+ * por dimensión, áreas dominantes e interpretación. Para CHASIDE y Magdalena
+ * Contreras muestra además la comparación Interés-vs-Aptitud usando los totales
+ * crudos por área/campo.
  */
 function GenericMethodResults({
   session,
@@ -291,11 +292,12 @@ function GenericMethodResults({
     );
   }
 
-  const isChaside = session.methodId === "CHASIDE";
+  // CHASIDE y el Test Magdalena Contreras exponen en `raw` los totales por
+  // dimensión separados en Interés y Aptitud, lo que permite el panel dual
+  // "Interés vs. Aptitud". Ambos usan la misma vista genérica de barras.
+  const hasDualPanel =
+    session.methodId === "CHASIDE" || session.methodId === "MAGDALENA";
 
-  // CHASIDE guarda por área dos entradas (Interés y Aptitud) diferenciadas por
-  // el sufijo del código (p. ej. "C-INTERES" / "C-APTITUD"). Si el motor usa
-  // otra convención, se muestran igualmente todas las dimensiones como barras.
   const sorted = [...ms.dimensionScores].sort((a, b) => b.value - a.value);
 
   return (
@@ -357,8 +359,12 @@ function GenericMethodResults({
         </div>
       </div>
 
-      {isChaside ? (
-        <ChasideInteresAptitud ms={ms} dimensionTitles={sorted} />
+      {hasDualPanel ? (
+        <InteresAptitudPanel
+          methodId={session.methodId}
+          ms={ms}
+          dimensionTitles={sorted}
+        />
       ) : null}
 
       {/* Interpretación */}
@@ -384,60 +390,105 @@ function GenericMethodResults({
 /** Máximos por área del test CHASIDE (según su calificación). */
 const CHASIDE_INTERES_MAX = 10;
 const CHASIDE_APTITUD_MAX = 4;
+/** Máximo por campo del Test Magdalena Contreras (6 ítems x 4 = 24). */
+const MAGDALENA_FIELD_MAX = 24;
 
-/**
- * Extrae de forma defensiva los conteos crudos por área de Interés y Aptitud
- * guardados en `method_scores.raw` para CHASIDE. Devuelve null si el dato no
- * existe (filas antiguas) o no tiene la forma esperada.
- */
-function parseChasideCounts(
-  raw: Record<string, unknown> | null | undefined
-): { interes: Record<string, number>; aptitud: Record<string, number> } | null {
-  if (!raw || typeof raw !== "object") return null;
-  const interes = raw.interes;
-  const aptitud = raw.aptitud;
-  const isCountMap = (v: unknown): v is Record<string, number> =>
+/** Mapa de conteos/totales por dimensión (código -> valor numérico). */
+type CountMap = Record<string, number>;
+
+function isCountMap(v: unknown): v is CountMap {
+  return (
     typeof v === "object" &&
     v !== null &&
     !Array.isArray(v) &&
     Object.values(v as Record<string, unknown>).every(
       (n) => typeof n === "number"
-    );
-  if (!isCountMap(interes) || !isCountMap(aptitud)) return null;
-  return { interes, aptitud };
+    )
+  );
+}
+
+function isLabelMap(v: unknown): v is Record<string, string> {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    !Array.isArray(v) &&
+    Object.values(v as Record<string, unknown>).every(
+      (s) => typeof s === "string"
+    )
+  );
 }
 
 /**
- * Panel "Interés vs. Aptitud" de CHASIDE. A diferencia de las barras
- * combinadas por dimensión, aquí se grafican POR SEPARADO el conteo de Interés
- * (máx. 10) y el de Aptitud (máx. 4) de cada área, que es la lectura propia del
- * instrumento. Si no hay conteos crudos disponibles (sesiones antiguas), se
- * muestra un aviso en lugar de repetir las barras combinadas.
+ * Extrae de forma defensiva los totales crudos por dimensión de Interés y
+ * Aptitud guardados en `method_scores.raw` (CHASIDE y Magdalena comparten esta
+ * forma). Devuelve null si el dato no existe (filas antiguas) o no tiene la
+ * forma esperada. Para Magdalena también recupera las bandas por campo.
  */
-function ChasideInteresAptitud({
+function parseInteresAptitud(
+  raw: Record<string, unknown> | null | undefined
+): {
+  interes: CountMap;
+  aptitud: CountMap;
+  interesBands: Record<string, string> | null;
+  aptitudBands: Record<string, string> | null;
+} | null {
+  if (!raw || typeof raw !== "object") return null;
+  const interes = raw.interes;
+  const aptitud = raw.aptitud;
+  if (!isCountMap(interes) || !isCountMap(aptitud)) return null;
+  return {
+    interes,
+    aptitud,
+    interesBands: isLabelMap(raw.interesBands) ? raw.interesBands : null,
+    aptitudBands: isLabelMap(raw.aptitudBands) ? raw.aptitudBands : null,
+  };
+}
+
+/**
+ * Panel "Interés vs. Aptitud" compartido por CHASIDE y el Test Magdalena
+ * Contreras. A diferencia de las barras combinadas por dimensión, aquí se
+ * grafican POR SEPARADO los totales de Interés y de Aptitud de cada
+ * área/campo, que es la lectura propia de estos instrumentos. Los máximos por
+ * dimensión dependen del método (CHASIDE: 10/4; Magdalena: 24/24). Si no hay
+ * totales crudos disponibles (sesiones antiguas), se muestra un aviso en lugar
+ * de repetir las barras combinadas.
+ */
+function InteresAptitudPanel({
+  methodId,
   ms,
   dimensionTitles,
 }: {
+  methodId: string;
   ms: StoredMethodScores;
   dimensionTitles: StoredMethodScores["dimensionScores"];
 }) {
-  const counts = parseChasideCounts(ms.raw);
+  const data = parseInteresAptitud(ms.raw);
   const titleByCode = new Map(
     dimensionTitles.map((d) => [d.code, d.title] as const)
   );
 
+  const isMagdalena = methodId === "MAGDALENA";
+  // Máximos por dimensión según el método. Para Magdalena se admite un
+  // `fieldMax` en raw por si cambiara la longitud del banco.
+  const rawFieldMax =
+    ms.raw && typeof ms.raw.fieldMax === "number"
+      ? (ms.raw.fieldMax as number)
+      : MAGDALENA_FIELD_MAX;
+  const interesMax = isMagdalena ? rawFieldMax : CHASIDE_INTERES_MAX;
+  const aptitudMax = isMagdalena ? rawFieldMax : CHASIDE_APTITUD_MAX;
+
+  const description = isMagdalena
+    ? `El Test Magdalena Contreras evalúa por separado tu Interés y tu Aptitud autopercibida en cada campo (máx. ${interesMax} puntos por dimensión). Comparar ambos perfiles revela desajustes útiles (por ejemplo, alto interés con baja aptitud) para planear tu nivelación.`
+    : `CHASIDE evalúa por separado tus intereses (máx. ${interesMax} por área) y tus aptitudes (máx. ${aptitudMax} por área). Un perfil alineado muestra interés y aptitud altos en las mismas áreas.`;
+
   return (
     <div className="card" style={{ marginTop: 16 }}>
       <h2 style={{ marginTop: 0 }}>Interés vs. Aptitud</h2>
-      <p className="muted" style={{ marginTop: 0 }}>
-        CHASIDE evalúa por separado tus <strong>intereses</strong> (máx. 10 por
-        área) y tus <strong>aptitudes</strong> (máx. 4 por área). Un perfil
-        alineado muestra interés y aptitud altos en las mismas áreas.
-      </p>
+      <p className="muted" style={{ marginTop: 0 }}>{description}</p>
 
-      {!counts ? (
+      {!data ? (
         <div className="alert alert-warning" role="status">
-          No hay conteos separados de interés y aptitud disponibles para esta
+          No hay totales separados de interés y aptitud disponibles para esta
           evaluación.
         </div>
       ) : (
@@ -446,19 +497,17 @@ function ChasideInteresAptitud({
             .map((d) => ({
               code: d.code,
               title: titleByCode.get(d.code) ?? d.code,
-              interes: counts.interes[d.code] ?? 0,
-              aptitud: counts.aptitud[d.code] ?? 0,
+              interes: data.interes[d.code] ?? 0,
+              aptitud: data.aptitud[d.code] ?? 0,
+              interesBand: data.interesBands?.[d.code] ?? null,
+              aptitudBand: data.aptitudBands?.[d.code] ?? null,
             }))
             .sort((a, b) => b.interes - a.interes || b.aptitud - a.aptitud)
             .map((row) => {
-              const interesPct = Math.round(
-                (row.interes / CHASIDE_INTERES_MAX) * 100
-              );
-              const aptitudPct = Math.round(
-                (row.aptitud / CHASIDE_APTITUD_MAX) * 100
-              );
+              const interesPct = Math.round((row.interes / interesMax) * 100);
+              const aptitudPct = Math.round((row.aptitud / aptitudMax) * 100);
               return (
-                <div key={`chaside-ia-${row.code}`}>
+                <div key={`ia-${row.code}`}>
                   <div
                     className="row spread"
                     style={{ marginBottom: 4, fontWeight: 600 }}
@@ -472,9 +521,12 @@ function ChasideInteresAptitud({
                     className="row spread"
                     style={{ marginBottom: 2, fontSize: 13 }}
                   >
-                    <span className="muted">Interés</span>
                     <span className="muted">
-                      {row.interes}/{CHASIDE_INTERES_MAX}
+                      Interés
+                      {row.interesBand ? ` · ${row.interesBand}` : ""}
+                    </span>
+                    <span className="muted">
+                      {row.interes}/{interesMax}
                     </span>
                   </div>
                   <div className="row" style={{ marginBottom: 8 }}>
@@ -490,9 +542,12 @@ function ChasideInteresAptitud({
                     className="row spread"
                     style={{ marginBottom: 2, fontSize: 13 }}
                   >
-                    <span className="muted">Aptitud</span>
                     <span className="muted">
-                      {row.aptitud}/{CHASIDE_APTITUD_MAX}
+                      Aptitud
+                      {row.aptitudBand ? ` · ${row.aptitudBand}` : ""}
+                    </span>
+                    <span className="muted">
+                      {row.aptitud}/{aptitudMax}
                     </span>
                   </div>
                   <div className="row">
