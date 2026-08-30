@@ -40,24 +40,16 @@ vi.mock("@/lib/db", () => ({
       return [];
     }
 
-    if (s.startsWith("SELECT EMAIL, EXPIRES_AT, CONSUMED_AT")) {
-      const [token] = params as [string];
-      const row = db.get(token);
-      if (!row) return [];
-      return [{
-        email: row.email,
-        expires_at: row.expires_at,
-        consumed_at: row.consumed_at,
-      }];
-    }
-
+    // Consumo atómico: UPDATE ... WHERE token = $2 AND consumed_at IS NULL
+    // AND expires_at > $3 RETURNING email
     if (s.startsWith("UPDATE EMAIL_VERIFICATION_TOKENS")) {
-      const [consumedAt, token] = params as [number, string];
+      const [consumedAt, token, now] = params as [number, string, number];
       const row = db.get(token);
-      if (row) {
-        db.set(token, { ...row, consumed_at: consumedAt });
-      }
-      return [];
+      if (!row) return [];                    // Token no existe.
+      if (row.consumed_at !== null) return []; // Ya consumido.
+      if (row.expires_at <= now) return [];    // Expirado.
+      db.set(token, { ...row, consumed_at: consumedAt });
+      return [{ email: row.email }];
     }
 
     return [];

@@ -49,9 +49,13 @@ export async function createVerificationToken(email: string): Promise<string> {
 }
 
 /**
- * Consume un token de verificación:
+ * Consume un token de verificación de forma atómica:
  *  - Si no existe, está expirado o ya fue usado, devuelve null.
  *  - Si es válido, marca consumed_at = ahora y devuelve el correo asociado.
+ *
+ * La operación es una única sentencia UPDATE … WHERE … RETURNING para
+ * eliminar la ventana de concurrencia que tendría un SELECT + UPDATE por
+ * separado.
  */
 export async function consumeVerificationToken(
   token: string
@@ -60,30 +64,19 @@ export async function consumeVerificationToken(
 
   const now = Date.now();
 
-  // Buscar el token: debe existir, no estar expirado y no estar consumido.
+  // Una sola sentencia atómica: selecciona y consume el token solo si no fue
+  // consumido antes y no ha expirado. Devuelve el email si tuvo éxito.
   const rows = await query(
-    `SELECT email, expires_at, consumed_at
-     FROM email_verification_tokens
-     WHERE token = $1`,
-    [token]
+    `UPDATE email_verification_tokens
+     SET consumed_at = $1
+     WHERE token = $2
+       AND consumed_at IS NULL
+       AND expires_at > $3
+     RETURNING email`,
+    [now, token, now]
   );
 
   if (rows.length === 0) return null;
 
-  const row = rows[0];
-  const expiresAt = row.expires_at as number;
-  const consumedAt = row.consumed_at as number | null;
-
-  if (consumedAt !== null) return null; // Ya fue utilizado.
-  if (now > expiresAt) return null;     // Expirado.
-
-  // Marcar como consumido.
-  await query(
-    `UPDATE email_verification_tokens
-     SET consumed_at = $1
-     WHERE token = $2`,
-    [now, token]
-  );
-
-  return row.email as string;
+  return rows[0].email as string;
 }

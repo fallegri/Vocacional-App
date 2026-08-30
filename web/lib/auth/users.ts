@@ -64,7 +64,6 @@ export async function createUser(params: {
   const { email, displayName, passwordHash, role = "STUDENT" } = params;
   const normalized = email.trim().toLowerCase();
   const id = `email:${normalized}`;
-  const now = Date.now();
 
   const rows = await query(
     `INSERT INTO app_users
@@ -73,7 +72,7 @@ export async function createUser(params: {
      ON CONFLICT DO NOTHING
      RETURNING id, email, display_name, role, password_hash,
                email_verified_at, auth_provider`,
-    [id, normalized, displayName.trim(), role, passwordHash, now]
+    [id, normalized, displayName.trim(), role, passwordHash]
   );
 
   if (rows.length === 0) return null;

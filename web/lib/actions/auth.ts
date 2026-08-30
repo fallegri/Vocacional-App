@@ -18,6 +18,7 @@ import { AuthError } from "next-auth";
 
 export interface RegisterResult {
   ok: boolean;
+  resent?: boolean;
   error?: string;
 }
 
@@ -56,7 +57,7 @@ export async function registerAction(params: {
 
   // Importaciones lazy para cumplir la invariante de build.
   const { hashPassword } = await import("@/lib/auth/passwords");
-  const { createUser } = await import("@/lib/auth/users");
+  const { createUser, findUserByEmail } = await import("@/lib/auth/users");
   const { createVerificationToken } = await import("@/lib/auth/tokens");
   const { sendVerificationEmail } = await import("@/lib/email/client");
 
@@ -66,10 +67,29 @@ export async function registerAction(params: {
 
   if (!newUser) {
     // ON CONFLICT DO NOTHING devolvió 0 filas: el correo ya está registrado.
+    // Verificar si la cuenta existente está sin verificar para reenviar el
+    // correo de confirmación en lugar de bloquear al usuario.
+    const existing = await findUserByEmail(email);
+    if (existing && existing.emailVerifiedAt === null) {
+      // La cuenta existe pero no está verificada. Generar y enviar un nuevo
+      // token para desbloquear el flujo de verificación.
+      try {
+        const token = await createVerificationToken(email);
+        await sendVerificationEmail(email, token, existing.displayName);
+      } catch {
+        console.error("[registerAction] Error al reenviar correo de verificación.");
+      }
+      return {
+        ok: true,
+        resent: true,
+        error:
+          "Ya existe una cuenta sin verificar con ese correo. Te hemos enviado un nuevo correo de confirmación.",
+      };
+    }
     return {
       ok: false,
       error:
-        "Ya existe una cuenta con ese correo. Inicia sesión o recupera tu contraseña.",
+        "Ya existe una cuenta verificada con ese correo. Inicia sesión.",
     };
   }
 

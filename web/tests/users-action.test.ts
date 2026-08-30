@@ -20,17 +20,26 @@ vi.mock("@/lib/auth/staff", () => ({
   authorizeStaffWithRoles: vi.fn(),
 }));
 
+vi.mock("@/lib/auth/session", () => ({
+  getCurrentUser: vi.fn(),
+}));
+
 // Importar módulos y mocks DESPUÉS de declarar los vi.mock.
 import { setUserRole, listUsers } from "@/lib/actions/users";
 import { query } from "@/lib/db";
 import { authorizeStaffWithRoles } from "@/lib/auth/staff";
+import { getCurrentUser } from "@/lib/auth/session";
 
 const mockQuery = vi.mocked(query);
 const mockAuthorizeStaffWithRoles = vi.mocked(authorizeStaffWithRoles);
+const mockGetCurrentUser = vi.mocked(getCurrentUser);
 
 beforeEach(() => {
   mockQuery.mockReset();
   mockAuthorizeStaffWithRoles.mockReset();
+  mockGetCurrentUser.mockReset();
+  // Por defecto el caller no es el mismo usuario objetivo.
+  mockGetCurrentUser.mockResolvedValue({ email: "admin@orientapp.local", role: "SUPER_ADMIN" });
 });
 
 describe("setUserRole", () => {
@@ -99,12 +108,37 @@ describe("setUserRole", () => {
 
   it("devuelve error cuando la DB falla", async () => {
     mockAuthorizeStaffWithRoles.mockResolvedValue({ ok: true });
+    mockGetCurrentUser.mockResolvedValue({ email: "admin@orientapp.local", role: "SUPER_ADMIN" });
     mockQuery.mockRejectedValue(new Error("Conexión rechazada"));
 
     const result = await setUserRole("alumno@example.com", "REPORT_REVIEWER");
 
     expect(result.ok).toBe(false);
     expect(result.error).toContain("Conexión rechazada");
+  });
+
+  it("devuelve error si el SUPER_ADMIN intenta cambiar su propio rol", async () => {
+    mockAuthorizeStaffWithRoles.mockResolvedValue({ ok: true });
+    // El caller tiene el mismo correo que el objetivo.
+    mockGetCurrentUser.mockResolvedValue({ email: "admin@orientapp.local", role: "SUPER_ADMIN" });
+
+    const result = await setUserRole("admin@orientapp.local", "STUDENT");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("No puedes cambiar tu propio rol.");
+    expect(mockQuery).not.toHaveBeenCalled();
+  });
+
+  it("normaliza el correo del objetivo antes de compararlo con el caller", async () => {
+    mockAuthorizeStaffWithRoles.mockResolvedValue({ ok: true });
+    // El caller usa minúsculas; el objetivo se pasa en mayúsculas.
+    mockGetCurrentUser.mockResolvedValue({ email: "admin@orientapp.local", role: "SUPER_ADMIN" });
+
+    const result = await setUserRole("ADMIN@ORIENTAPP.LOCAL", "STUDENT");
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("No puedes cambiar tu propio rol.");
+    expect(mockQuery).not.toHaveBeenCalled();
   });
 });
 

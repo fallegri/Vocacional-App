@@ -12,6 +12,7 @@
 
 import { query } from "@/lib/db";
 import { authorizeStaffWithRoles } from "@/lib/auth/staff";
+import { getCurrentUser } from "@/lib/auth/session";
 import type { UserRoleCode } from "@/lib/riasec/types";
 
 export interface AppUserSummary {
@@ -88,6 +89,12 @@ export async function setUserRole(
   const normalized = email.trim().toLowerCase();
   if (!normalized) {
     return { ok: false, error: "El correo del usuario no puede estar vacío." };
+  }
+
+  // Impedir que el SUPER_ADMIN cambie su propio rol para evitar auto-bloqueo.
+  const caller = await getCurrentUser();
+  if (caller?.email === normalized) {
+    return { ok: false, error: "No puedes cambiar tu propio rol." };
   }
 
   // Validar que el rol sea uno de los valores permitidos.

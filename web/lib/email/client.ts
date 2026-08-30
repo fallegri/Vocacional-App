@@ -93,17 +93,30 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
 /**
  * Envía el correo de verificación de cuenta al usuario recién registrado.
  *
- * @param email Correo del destinatario.
- * @param token Token de verificación a incluir en el enlace.
+ * @param email    Correo del destinatario.
+ * @param token    Token de verificación a incluir en el enlace.
  * @param displayName Nombre visible del usuario (opcional).
+ * @param appUrl   URL base de la aplicación (opcional; si no se pasa, se usa
+ *                 NEXT_PUBLIC_APP_URL o se cae al localhost con advertencia).
  */
 export async function sendVerificationEmail(
   email: string,
   token: string,
-  displayName?: string
+  displayName?: string,
+  appUrl?: string
 ): Promise<EmailResult> {
-  const baseUrl =
-    (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "http://localhost:3000";
+  const configuredUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim();
+  const resolvedUrl = appUrl?.trim() || configuredUrl;
+
+  let baseUrl: string;
+  if (resolvedUrl) {
+    baseUrl = resolvedUrl;
+  } else {
+    console.warn(
+      "[email] Advertencia: NEXT_PUBLIC_APP_URL no está definida; el enlace de verificación puede ser incorrecto en producción."
+    );
+    baseUrl = "http://localhost:3000";
+  }
 
   const verifyUrl = `${baseUrl}/verify?token=${encodeURIComponent(token)}`;
 
