@@ -22,6 +22,7 @@ import path from "node:path";
 
 import { query } from "@/lib/db";
 import { DEFAULT_COHORTS, DEFAULT_USERS } from "@/data/seed";
+import { hashPassword } from "@/lib/auth/passwords";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SCHEMA_PATH = path.resolve(HERE, "..", "db", "schema.sql");
@@ -104,6 +105,10 @@ async function seedCohorts(): Promise<void> {
 }
 
 async function seedUsers(): Promise<void> {
+  if (DEFAULT_USERS.length === 0) {
+    console.log("→ DEFAULT_USERS está vacío, no hay usuarios semilla adicionales.");
+    return;
+  }
   console.log("→ Insertando usuarios semilla (DEFAULT_USERS) ...");
   let inserted = 0;
   for (const user of DEFAULT_USERS) {
@@ -111,7 +116,7 @@ async function seedUsers(): Promise<void> {
       `INSERT INTO app_users (
           id, email, display_name, role, cohort_code, auth_provider, institution
        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (id) DO NOTHING
+       ON CONFLICT DO NOTHING
        RETURNING id`,
       [
         user.id,
@@ -128,6 +133,45 @@ async function seedUsers(): Promise<void> {
   console.log(
     `  ✓ ${inserted} usuarios nuevos (${DEFAULT_USERS.length - inserted} ya existían).`
   );
+}
+
+/**
+ * Siembra el administrador inicial con contraseña hasheada con bcrypt.
+ * Usa ON CONFLICT en lower(email) DO NOTHING para ser idempotente.
+ * La contraseña por defecto es OrientApp!Admin2026; puede sobrescribirse
+ * con las variables de entorno INITIAL_ADMIN_EMAIL e INITIAL_ADMIN_PASSWORD.
+ */
+async function seedAdmin(): Promise<void> {
+  console.log("→ Sembrando administrador inicial ...");
+
+  const adminEmail = (
+    process.env.INITIAL_ADMIN_EMAIL ?? "admin@orientapp.local"
+  ).trim().toLowerCase();
+
+  const adminPassword =
+    (process.env.INITIAL_ADMIN_PASSWORD ?? "OrientApp!Admin2026").trim();
+
+  // Hashear la contraseña en tiempo de ejecución (NUNCA se almacena en texto plano).
+  const passwordHash = await hashPassword(adminPassword);
+
+  const adminId = `email:${adminEmail}`;
+  const now = Date.now();
+
+  const rows = await query(
+    `INSERT INTO app_users
+       (id, email, display_name, role, auth_provider,
+        email_verified_at, password_hash)
+     VALUES ($1, $2, $3, 'SUPER_ADMIN', 'EMAIL', $4, $5)
+     ON CONFLICT DO NOTHING
+     RETURNING id`,
+    [adminId, adminEmail, "Administrador OrientApp", now, passwordHash]
+  );
+
+  if (rows.length > 0) {
+    console.log(`  ✓ Administrador creado: ${adminEmail}`);
+  } else {
+    console.log(`  ℹ Administrador ya existe: ${adminEmail} (sin cambios).`);
+  }
 }
 
 async function main(): Promise<void> {
@@ -147,7 +191,8 @@ async function main(): Promise<void> {
   await applySchema();
   await seedCohorts();
   await seedUsers();
-  console.log("\n✓ Base de datos lista. Cohortes y usuarios semilla cargados.");
+  await seedAdmin();
+  console.log("\n✓ Base de datos lista. Cohortes, usuarios semilla y administrador inicial cargados.");
 }
 
 function describeError(err: unknown): string {
@@ -165,8 +210,7 @@ function describeError(err: unknown): string {
 main().catch((err: unknown) => {
   console.error(
     `\n✗ Error al sembrar la base de datos: ${describeError(err)}\n` +
-      "  Verifica que DATABASE_URL apunte a una base Neon accesible y que la\n" +
-      "  extensión pgvector esté disponible (CREATE EXTENSION vector).\n"
+      "  Verifica que DATABASE_URL apunte a una base Neon accesible.\n"
   );
   process.exit(1);
 });

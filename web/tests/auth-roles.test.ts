@@ -33,8 +33,7 @@ vi.mock("next-auth", () => ({
     signOut: () => {},
   }),
 }));
-vi.mock("next-auth/providers/google", () => ({ default: () => ({}) }));
-vi.mock("@/lib/auth/link-user", () => ({ linkOrCreateUser: async () => {} }));
+vi.mock("next-auth/providers/credentials", () => ({ default: () => ({}) }));
 
 // Solo mockeamos getCurrentUser para inyectar la sesión en las pruebas de la
 // guardia; isAuthConfigured se usa REAL (leyendo process.env).
@@ -43,9 +42,8 @@ vi.mock("@/lib/auth/session", () => ({
   getCurrentUser: async () => currentUser,
 }));
 
-import { resolveRoleForEmail, isStaffRole } from "@/lib/auth/roles";
+import { isStaffRole } from "@/lib/auth/roles";
 import { isAuthConfigured } from "@/auth";
-import { DEFAULT_USERS } from "@/data/seed";
 import {
   authorizeStaff,
   authorizeStaffWithRoles,
@@ -56,22 +54,15 @@ import {
 
 // --- Limpieza de variables de entorno usadas por las pruebas ----------------
 const ENV_KEYS = [
-  "ADMIN_EMAILS",
-  "TEST_ADMIN_EMAILS",
-  "REPORT_REVIEWER_EMAILS",
   "STAFF_ACCESS_TOKEN",
-  "GOOGLE_CLIENT_ID",
-  "GOOGLE_CLIENT_SECRET",
   "AUTH_SECRET",
 ] as const;
 
 const ORIGINAL: Record<string, string | undefined> = {};
 for (const k of ENV_KEYS) ORIGINAL[k] = process.env[k];
 
-/** Define las tres variables de OAuth para que isAuthConfigured() sea true. */
+/** Define AUTH_SECRET para que isAuthConfigured() sea true. */
 function configureOAuth() {
-  process.env.GOOGLE_CLIENT_ID = "test-client-id";
-  process.env.GOOGLE_CLIENT_SECRET = "test-client-secret";
   process.env.AUTH_SECRET = "test-auth-secret";
 }
 
@@ -88,76 +79,7 @@ afterEach(() => {
 });
 
 // ===========================================================================
-// resolveRoleForEmail (función pura, sin mocks)
-// ===========================================================================
-describe("resolveRoleForEmail", () => {
-  it("devuelve el rol semilla de un correo de DEFAULT_USERS (case-insensitive)", () => {
-    const superAdmin = DEFAULT_USERS.find((u) => u.role === "SUPER_ADMIN")!;
-    const reviewer = DEFAULT_USERS.find((u) => u.role === "REPORT_REVIEWER")!;
-    const student = DEFAULT_USERS.find((u) => u.role === "STUDENT")!;
-
-    expect(resolveRoleForEmail(superAdmin.email)).toBe("SUPER_ADMIN");
-    // Misma coincidencia sin distinguir mayúsculas ni espacios.
-    expect(resolveRoleForEmail(`  ${superAdmin.email.toUpperCase()}  `)).toBe(
-      "SUPER_ADMIN"
-    );
-    expect(resolveRoleForEmail(reviewer.email)).toBe("REPORT_REVIEWER");
-    expect(resolveRoleForEmail(student.email)).toBe("STUDENT");
-  });
-
-  it("el rol semilla tiene prioridad sobre las allowlists de entorno", () => {
-    const student = DEFAULT_USERS.find((u) => u.role === "STUDENT")!;
-    // Aunque metamos al estudiante semilla en ADMIN_EMAILS, gana la semilla.
-    process.env.ADMIN_EMAILS = student.email;
-    expect(resolveRoleForEmail(student.email)).toBe("STUDENT");
-  });
-
-  it("honra ADMIN_EMAILS -> SUPER_ADMIN", () => {
-    process.env.ADMIN_EMAILS = "jefe@empresa.com, otro@empresa.com";
-    expect(resolveRoleForEmail("jefe@empresa.com")).toBe("SUPER_ADMIN");
-    expect(resolveRoleForEmail("OTRO@empresa.com")).toBe("SUPER_ADMIN");
-  });
-
-  it("honra TEST_ADMIN_EMAILS -> TEST_ADMIN", () => {
-    process.env.TEST_ADMIN_EMAILS = "coordinador@empresa.com";
-    expect(resolveRoleForEmail("coordinador@empresa.com")).toBe("TEST_ADMIN");
-  });
-
-  it("honra REPORT_REVIEWER_EMAILS -> REPORT_REVIEWER", () => {
-    process.env.REPORT_REVIEWER_EMAILS = "revisor@empresa.com";
-    expect(resolveRoleForEmail("revisor@empresa.com")).toBe("REPORT_REVIEWER");
-  });
-
-  it("acepta separadores por coma y/o espacios en las listas", () => {
-    process.env.ADMIN_EMAILS = "a@x.com b@x.com,c@x.com\td@x.com";
-    expect(resolveRoleForEmail("a@x.com")).toBe("SUPER_ADMIN");
-    expect(resolveRoleForEmail("b@x.com")).toBe("SUPER_ADMIN");
-    expect(resolveRoleForEmail("c@x.com")).toBe("SUPER_ADMIN");
-    expect(resolveRoleForEmail("d@x.com")).toBe("SUPER_ADMIN");
-  });
-
-  it("gana el rol de MAYOR privilegio cuando un correo está en varias listas", () => {
-    const email = "multi@empresa.com";
-    process.env.ADMIN_EMAILS = email;
-    process.env.TEST_ADMIN_EMAILS = email;
-    process.env.REPORT_REVIEWER_EMAILS = email;
-    // SUPER_ADMIN es el más privilegiado de los tres.
-    expect(resolveRoleForEmail(email)).toBe("SUPER_ADMIN");
-
-    // Sin ADMIN_EMAILS, gana TEST_ADMIN sobre REPORT_REVIEWER.
-    delete process.env.ADMIN_EMAILS;
-    expect(resolveRoleForEmail(email)).toBe("TEST_ADMIN");
-  });
-
-  it("por defecto devuelve STUDENT para correos desconocidos o vacíos", () => {
-    expect(resolveRoleForEmail("nadie@desconocido.com")).toBe("STUDENT");
-    expect(resolveRoleForEmail("")).toBe("STUDENT");
-    // Sin allowlists configuradas, cualquier correo cae a STUDENT.
-    expect(resolveRoleForEmail("jefe@empresa.com")).toBe("STUDENT");
-  });
-});
-
-// ===========================================================================
+// resolveRoleForEmail ya NO existe (fue reemplazada por DB-backed getUserRole).
 // isStaffRole (función pura, sin mocks)
 // ===========================================================================
 describe("isStaffRole", () => {
@@ -165,37 +87,29 @@ describe("isStaffRole", () => {
     expect(isStaffRole("SUPER_ADMIN")).toBe(true);
     expect(isStaffRole("TEST_ADMIN")).toBe(true);
     expect(isStaffRole("REPORT_REVIEWER")).toBe(true);
+    expect(isStaffRole("PROFESOR")).toBe(true);
   });
 
   it("es false para STUDENT", () => {
     expect(isStaffRole("STUDENT")).toBe(false);
   });
-});
+})
 
 // ===========================================================================
 // isAuthConfigured (lógica real de web/auth.ts)
 // ===========================================================================
 describe("isAuthConfigured", () => {
-  it("es false cuando no hay ninguna variable de OAuth definida", () => {
+  it("es false cuando AUTH_SECRET no está definida", () => {
     expect(isAuthConfigured()).toBe(false);
   });
 
-  it("es false cuando falta alguna de las tres variables", () => {
-    process.env.GOOGLE_CLIENT_ID = "id";
-    process.env.GOOGLE_CLIENT_SECRET = "secret";
-    // Falta AUTH_SECRET.
-    expect(isAuthConfigured()).toBe(false);
-  });
-
-  it("es false cuando alguna variable está en blanco", () => {
-    process.env.GOOGLE_CLIENT_ID = "id";
-    process.env.GOOGLE_CLIENT_SECRET = "secret";
+  it("es false cuando AUTH_SECRET está en blanco", () => {
     process.env.AUTH_SECRET = "   ";
     expect(isAuthConfigured()).toBe(false);
   });
 
-  it("es true solo cuando las tres variables están definidas y no vacías", () => {
-    configureOAuth();
+  it("es true cuando AUTH_SECRET está definida y no está en blanco", () => {
+    process.env.AUTH_SECRET = "test-auth-secret";
     expect(isAuthConfigured()).toBe(true);
   });
 });

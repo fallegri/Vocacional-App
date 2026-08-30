@@ -156,6 +156,7 @@ export interface DiagnosticResult {
 export type UserRoleCode =
   | "SUPER_ADMIN"
   | "TEST_ADMIN"
+  | "PROFESOR"
   | "REPORT_REVIEWER"
   | "STUDENT";
 
@@ -184,6 +185,14 @@ export const USER_ROLES: Record<UserRoleCode, UserRoleMeta> = {
     badgeIcon: "📋",
     isStaff: true,
   },
+  PROFESOR: {
+    code: "PROFESOR",
+    title: "Profesor",
+    description:
+      "Docente u orientador que puede revisar los resultados deterministas de los estudiantes de sus grupos",
+    badgeIcon: "🏫",
+    isStaff: true,
+  },
   REPORT_REVIEWER: {
     code: "REPORT_REVIEWER",
     title: "Revisor de Reportes",
@@ -202,7 +211,7 @@ export const USER_ROLES: Record<UserRoleCode, UserRoleMeta> = {
   },
 };
 
-export type AuthProviderCode = "GOOGLE" | "EMAIL" | "GUEST";
+export type AuthProviderCode = "EMAIL" | "GOOGLE" | "GUEST";
 
 export const AUTH_PROVIDERS: Record<AuthProviderCode, { displayName: string }> = {
   GOOGLE: { displayName: "Google / Gmail" },

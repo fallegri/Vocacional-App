@@ -1,89 +1,38 @@
 // ===========================================================================
-// Resolución de rol para un correo autenticado (OAuth Google).
+// Resolución de rol para un correo autenticado (Credentials / Auth.js v5).
 //
-// Módulo PURO y sin efectos secundarios: no toca la base de datos ni lee
-// variables de entorno al cargarse. Todas las variables de entorno se leen en
-// tiempo de llamada (process.env.*), para que `next build` y `tsc --noEmit`
-// funcionen sin ningún secreto definido.
+// A partir de FEAT-002 el rol se lee de la base de datos (app_users) en el
+// momento del inicio de sesión y se almacena en el JWT. La antigua lógica de
+// allowlists por variables de entorno ha sido eliminada.
 //
-// Orden de resolución (gana el más privilegiado):
-//   1. Coincidencia exacta (sin distinguir mayúsculas) contra DEFAULT_USERS
-//      de web/data/seed.ts: se usa el rol de ese usuario semilla.
-//   2. Listas de permitidos por entorno:
-//        ADMIN_EMAILS            -> SUPER_ADMIN
-//        TEST_ADMIN_EMAILS       -> TEST_ADMIN
-//        REPORT_REVIEWER_EMAILS  -> REPORT_REVIEWER
-//      Cada variable es una lista de correos separados por coma y/o espacios,
-//      comparados sin distinguir mayúsculas. Si un correo aparece en más de una
-//      lista, gana el rol de mayor privilegio.
-//   3. Por defecto: STUDENT.
+// Este módulo es PURO al cargarse: no lee variables de entorno ni accede a
+// la base de datos al importarse. Toda la lógica lazy queda en los helpers de
+// lib/auth/users.ts.
+//
+// isStaffRole(role) es la única función pura exportada aquí; se mantiene para
+// que los guardas de autorización (staff.ts, session.ts, read-access.ts) puedan
+// verificar si un rol pertenece al personal sin depender de lib/auth/users.ts.
 // ===========================================================================
 
-import { DEFAULT_USERS } from "@/data/seed";
 import { USER_ROLES, type UserRoleCode } from "@/lib/riasec/types";
 
-/** Prioridad de roles: índice menor = mayor privilegio. */
-const ROLE_PRIORITY: UserRoleCode[] = [
-  "SUPER_ADMIN",
-  "TEST_ADMIN",
-  "REPORT_REVIEWER",
-  "STUDENT",
-];
-
-/** Normaliza un correo para comparaciones (trim + minúsculas). */
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
-
-/** Divide una lista de correos separados por coma y/o espacios. */
-function parseEmailList(raw: string | undefined | null): string[] {
-  if (!raw) return [];
-  return raw
-    .split(/[\s,]+/)
-    .map((e) => normalizeEmail(e))
-    .filter((e) => e.length > 0);
-}
-
-/** Devuelve el rol de mayor privilegio entre dos códigos. */
-function higherPrivilege(a: UserRoleCode, b: UserRoleCode): UserRoleCode {
-  return ROLE_PRIORITY.indexOf(a) <= ROLE_PRIORITY.indexOf(b) ? a : b;
+/**
+ * true si el rol corresponde a personal (staff), consultando USER_ROLES.
+ * Incluye SUPER_ADMIN, TEST_ADMIN, PROFESOR y REPORT_REVIEWER.
+ */
+export function isStaffRole(role: UserRoleCode): boolean {
+  return USER_ROLES[role]?.isStaff ?? false;
 }
 
 /**
- * Resuelve el UserRoleCode para un correo dado siguiendo el orden documentado
- * arriba. Lee las variables de entorno en tiempo de llamada.
+ * Obtiene el rol de un usuario por correo electrónico desde la base de datos.
+ * Devuelve 'STUDENT' si el usuario no existe.
+ *
+ * Esta función es una capa de indirección sobre lib/auth/users.getUserRole para
+ * mantener compatibilidad con los módulos que importan desde lib/auth/roles.
+ * Solo se ejecuta en tiempo de petición (nunca al cargar el módulo).
  */
-export function resolveRoleForEmail(email: string): UserRoleCode {
-  const normalized = normalizeEmail(email ?? "");
-  if (!normalized) return "STUDENT";
-
-  // (1) Usuarios semilla (DEFAULT_USERS): coincidencia exacta case-insensitive.
-  const seedUser = DEFAULT_USERS.find(
-    (u) => normalizeEmail(u.email) === normalized
-  );
-  if (seedUser) return seedUser.role;
-
-  // (2) Listas de permitidos por entorno. Gana el rol de mayor privilegio.
-  const allowlists: Array<{ role: UserRoleCode; envVar: string }> = [
-    { role: "SUPER_ADMIN", envVar: "ADMIN_EMAILS" },
-    { role: "TEST_ADMIN", envVar: "TEST_ADMIN_EMAILS" },
-    { role: "REPORT_REVIEWER", envVar: "REPORT_REVIEWER_EMAILS" },
-  ];
-
-  let matched: UserRoleCode | null = null;
-  for (const { role, envVar } of allowlists) {
-    const list = parseEmailList(process.env[envVar]);
-    if (list.includes(normalized)) {
-      matched = matched ? higherPrivilege(matched, role) : role;
-    }
-  }
-  if (matched) return matched;
-
-  // (3) Por defecto.
-  return "STUDENT";
-}
-
-/** true si el rol corresponde a personal (staff), reutilizando USER_ROLES. */
-export function isStaffRole(role: UserRoleCode): boolean {
-  return USER_ROLES[role].isStaff;
+export async function resolveRoleFromDB(email: string): Promise<UserRoleCode> {
+  const { getUserRole } = await import("@/lib/auth/users");
+  return getUserRole(email);
 }

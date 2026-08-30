@@ -28,8 +28,7 @@ vi.mock("next-auth", () => ({
     signOut: () => {},
   }),
 }));
-vi.mock("next-auth/providers/google", () => ({ default: () => ({}) }));
-vi.mock("@/lib/auth/link-user", () => ({ linkOrCreateUser: async () => {} }));
+vi.mock("next-auth/providers/credentials", () => ({ default: () => ({}) }));
 
 let currentUser: { email: string; role: string } | null = null;
 vi.mock("@/lib/auth/session", async () => {
@@ -71,8 +70,6 @@ import ResultsPage from "@/app/results/[sessionId]/page";
 import AccessRestricted from "@/components/AccessRestricted";
 
 const ENV_KEYS = [
-  "GOOGLE_CLIENT_ID",
-  "GOOGLE_CLIENT_SECRET",
   "AUTH_SECRET",
   "STAFF_ACCESS_TOKEN",
 ] as const;
@@ -81,8 +78,6 @@ const ORIGINAL: Record<string, string | undefined> = {};
 for (const k of ENV_KEYS) ORIGINAL[k] = process.env[k];
 
 function configureOAuth() {
-  process.env.GOOGLE_CLIENT_ID = "test-client-id";
-  process.env.GOOGLE_CLIENT_SECRET = "test-client-secret";
   process.env.AUTH_SECRET = "test-auth-secret";
 }
 

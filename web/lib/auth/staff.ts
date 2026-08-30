@@ -2,14 +2,14 @@
 // Guardia de autorización para operaciones de personal (staff).
 //
 // A partir de FEAT-002 la autorización es PRINCIPALMENTE basada en ROLES vía
-// OAuth (Auth.js / Google). Cuando la autenticación está configurada
-// (isAuthConfigured() === true), la sesión del usuario y su rol son la única
-// puerta de acceso: el token compartido queda deshabilitado.
+// credenciales (Auth.js / email+contraseña). Cuando la autenticación está
+// configurada (isAuthConfigured() === true), la sesión del usuario y su rol
+// son la única puerta de acceso: el token compartido queda deshabilitado.
 //
 // El antiguo STAFF_ACCESS_TOKEN se conserva ÚNICAMENTE como fallback local/demo:
 //  - isAuthConfigured() === false  &&  STAFF_ACCESS_TOKEN definido  -> se exige
 //    el token compartido (comportamiento heredado, útil en despliegues sin
-//    OAuth todavía).
+//    credenciales todavía configuradas).
 //  - isAuthConfigured() === false  &&  STAFF_ACCESS_TOKEN sin definir -> "modo
 //    demo": las mutaciones se permiten (para que `next build` sin variables de
 //    entorno y las demostraciones locales sigan funcionando).
@@ -41,8 +41,9 @@ const INSUFFICIENT_ROLE_ERROR =
 
 /**
  * true si el servidor exige un token de personal heredado. Ahora SOLO aplica
- * como fallback: cuando la autenticación OAuth NO está configurada y hay un
- * STAFF_ACCESS_TOKEN definido. Con OAuth configurado el token queda inactivo.
+ * como fallback: cuando la autenticación por credenciales NO está configurada
+ * y hay un STAFF_ACCESS_TOKEN definido. Con credenciales configuradas el token
+ * queda inactivo.
  */
 export function isStaffAuthEnabled(): boolean {
   if (isAuthConfigured()) return false;
@@ -63,9 +64,9 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 /**
- * Fallback heredado por token compartido. Solo se invoca cuando la auth OAuth
- * NO está configurada. { ok: true } en modo demo (sin token configurado) o
- * cuando el token presentado coincide.
+ * Fallback heredado por token compartido. Solo se invoca cuando la auth de
+ * credenciales NO está configurada. { ok: true } en modo demo (sin token
+ * configurado) o cuando el token presentado coincide.
  */
 function authorizeByToken(presentedToken: string | null | undefined): StaffAuthResult {
   const expected = (process.env.STAFF_ACCESS_TOKEN ?? "").trim();
@@ -90,10 +91,10 @@ function authorizeByToken(presentedToken: string | null | undefined): StaffAuthR
 
 /**
  * Autoriza una mutación exigiendo que el usuario autenticado tenga uno de los
- * `allowedRoles` (basado en rol vía OAuth). Si la auth NO está configurada, cae
- * al fallback heredado (token compartido o modo demo).
+ * `allowedRoles` (basado en rol vía credenciales). Si la auth NO está
+ * configurada, cae al fallback heredado (token compartido o modo demo).
  *
- * @param allowedRoles roles que pueden ejecutar la operación cuando hay OAuth.
+ * @param allowedRoles roles que pueden ejecutar la operación cuando hay credenciales.
  * @param presentedToken token heredado opcional (solo usado en el fallback).
  */
 export async function authorizeStaffWithRoles(
@@ -101,11 +102,11 @@ export async function authorizeStaffWithRoles(
   presentedToken?: string | null
 ): Promise<StaffAuthResult> {
   if (!isAuthConfigured()) {
-    // Sin OAuth: fallback local/demo por token compartido.
+    // Sin credenciales: fallback local/demo por token compartido.
     return authorizeByToken(presentedToken);
   }
 
-  // Con OAuth configurado, la sesión + rol es la única puerta de acceso.
+  // Con credenciales configuradas, la sesión + rol es la única puerta de acceso.
   const user = await getCurrentUser();
   if (!user || !isStaffRole(user.role)) {
     return { ok: false, error: NOT_STAFF_ERROR };
@@ -117,14 +118,14 @@ export async function authorizeStaffWithRoles(
 }
 
 /**
- * Autoriza una mutación de CUALQUIER personal (staff). Con OAuth configurado
- * exige un rol staff; sin OAuth cae al fallback heredado.
+ * Autoriza una mutación de CUALQUIER personal (staff). Con credenciales
+ * configuradas exige un rol staff; sin credenciales cae al fallback heredado.
  */
 export async function authorizeStaff(
   presentedToken?: string | null
 ): Promise<StaffAuthResult> {
   return authorizeStaffWithRoles(
-    ["SUPER_ADMIN", "TEST_ADMIN", "REPORT_REVIEWER"],
+    ["SUPER_ADMIN", "TEST_ADMIN", "PROFESOR", "REPORT_REVIEWER"],
     presentedToken
   );
 }
@@ -139,14 +140,15 @@ export function getStaffTokenFromRequest(request: Request): string | null {
 
 /**
  * Autoriza una mutación de personal a partir de una Request, exigiendo uno de
- * los `allowedRoles` cuando hay OAuth (o el fallback por token en su ausencia).
- * Por defecto admite cualquier rol staff.
+ * los `allowedRoles` cuando hay credenciales (o el fallback por token en su
+ * ausencia). Por defecto admite cualquier rol staff.
  */
 export async function authorizeStaffRequest(
   request: Request,
   allowedRoles: UserRoleCode[] = [
     "SUPER_ADMIN",
     "TEST_ADMIN",
+    "PROFESOR",
     "REPORT_REVIEWER",
   ]
 ): Promise<StaffAuthResult> {

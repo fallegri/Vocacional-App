@@ -1,8 +1,8 @@
 // ===========================================================================
 // Guardas de autorización de LECTURA (solo servidor).
 //
-// Extiende el modelo de roles OAuth (lib/auth/roles.ts, lib/auth/session.ts)
-// a las lecturas: no basta con proteger las mutaciones, también las páginas y
+// Extiende el modelo de roles (lib/auth/roles.ts, lib/auth/session.ts) a las
+// lecturas: no basta con proteger las mutaciones, también las páginas y
 // endpoints que LEEN datos de una sesión deben respetar la propiedad del
 // estudiante y los niveles de personal (staff).
 //
@@ -10,7 +10,7 @@
 //   - isAuthConfigured() === false  -> ok:true (MODO DEMO: las lecturas quedan
 //     abiertas, se preserva el comportamiento actual para que `next build` sin
 //     variables de entorno y las demostraciones locales sigan funcionando).
-//   - Con OAuth configurado:
+//   - Con credenciales configuradas:
 //       * anónimo (sin sesión)           -> ok:false
 //       * personal (isStaffRole)         -> ok:true (puede leer cualquier sesión)
 //       * STUDENT dueño de la sesión     -> ok:true SOLO si session.student_email
@@ -31,7 +31,7 @@ import { isStaffRole } from "@/lib/auth/roles";
 /** Resultado estructurado de una autorización de lectura de sesión. */
 export interface ReadAuthResult {
   ok: boolean;
-  /** true si la autenticación (OAuth Google) está configurada en el servidor. */
+  /** true si la autenticación (credenciales) está configurada en el servidor. */
   authConfigured: boolean;
   /** true si el usuario autenticado es personal (staff). */
   isStaff: boolean;
@@ -60,7 +60,7 @@ export async function authorizeSessionRead(
 ): Promise<ReadAuthResult> {
   const authConfigured = isAuthConfigured();
 
-  // Modo demo: sin OAuth, las lecturas quedan abiertas (comportamiento actual).
+  // Modo demo: sin credenciales, las lecturas quedan abiertas (comportamiento actual).
   if (!authConfigured) {
     return { ok: true, authConfigured: false, isStaff: false };
   }
@@ -71,7 +71,7 @@ export async function authorizeSessionRead(
       ok: false,
       authConfigured: true,
       isStaff: false,
-      error: "Debes iniciar sesión con Google para ver estos resultados.",
+      error: "Debes iniciar sesión para ver estos resultados.",
     };
   }
 

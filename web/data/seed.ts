@@ -318,38 +318,9 @@ export const DEFAULT_COHORTS: CohortGroup[] = [
   },
 ];
 
-export const DEFAULT_USERS: AppUser[] = [
-  {
-    id: "user_super_admin",
-    email: "admin.director@orientapp.edu",
-    displayName: "Lic. Fernando Allegri (Director)",
-    role: "SUPER_ADMIN",
-    authProvider: "GOOGLE",
-    institution: "OrientApp Central",
-  },
-  {
-    id: "user_test_admin",
-    email: "coordinador.test@orientapp.edu",
-    displayName: "Prof. Carlos Mendoza (Coord. Psicométrico)",
-    role: "TEST_ADMIN",
-    authProvider: "GOOGLE",
-    institution: "Instituto Tecnológico Superior",
-  },
-  {
-    id: "user_report_reviewer",
-    email: "orientadora.psico@orientapp.edu",
-    displayName: "Lic. Sofía Ramos (Gabinete Psicopedagógico)",
-    role: "REPORT_REVIEWER",
-    authProvider: "GOOGLE",
-    institution: "Colegio San Martín & Med-Salud",
-  },
-  {
-    id: "user_student_gmail",
-    email: "fernando.allegri@gmail.com",
-    displayName: "Fernando Allegri (Estudiante)",
-    role: "STUDENT",
-    cohortCode: "ING-2026-A",
-    authProvider: "GOOGLE",
-    institution: "Colegio Nacional San Martín",
-  },
-];
+export const DEFAULT_USERS: AppUser[] = [];
+// Los usuarios semilla de Google han sido eliminados en FEAT-002.
+// El administrador inicial (admin@orientapp.local) se siembra mediante
+// seedAdmin() en web/scripts/seed.ts con una contraseña hasheada con bcrypt.
+// El rol por defecto para nuevos usuarios auto-registrados es STUDENT.
+

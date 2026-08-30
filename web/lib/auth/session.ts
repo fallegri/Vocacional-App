@@ -9,8 +9,7 @@
 // Comportamiento cuando la autenticación NO está configurada
 // (isAuthConfigured() === false): getCurrentUser() devuelve null y las guardas
 // devuelven { ok: false, authConfigured: false, ... }. Se expone el flag
-// `authConfigured` en cada resultado para que FEAT-002 decida el fallback (por
-// ejemplo, preservar el "modo demo" actual mientras no haya OAuth desplegado).
+// `authConfigured` en cada resultado para que los módulos decidan el fallback.
 // Este módulo NO decide por sí mismo abrir el acceso; se limita a informar el
 // estado real y a exigir sesión+rol cuando la auth SÍ está configurada.
 // ===========================================================================
@@ -26,7 +25,7 @@ export interface CurrentUser {
 
 export interface AuthGuardResult {
   ok: boolean;
-  /** true si la autenticación (OAuth Google) está configurada en el servidor. */
+  /** true si la autenticación (credenciales) está configurada en el servidor. */
   authConfigured: boolean;
   /** Mensaje en español cuando ok === false. */
   error?: string;
@@ -46,7 +45,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const role = session?.user?.role;
   if (!email || !role) return null;
 
-  return { email, role };
+  return { email, role: role as UserRoleCode };
 }
 
 /**
@@ -62,7 +61,7 @@ export async function requireRole(
       ok: false,
       authConfigured: false,
       error:
-        "La autenticación con Google no está configurada en el servidor.",
+        "La autenticación no está configurada en el servidor.",
     };
   }
 
@@ -71,7 +70,7 @@ export async function requireRole(
     return {
       ok: false,
       authConfigured: true,
-      error: "Debes iniciar sesión con Google para continuar.",
+      error: "Debes iniciar sesión con tu correo y contraseña para continuar.",
     };
   }
 
@@ -98,7 +97,7 @@ export async function requireStaff(): Promise<AuthGuardResult> {
       ok: false,
       authConfigured: false,
       error:
-        "La autenticación con Google no está configurada en el servidor.",
+        "La autenticación no está configurada en el servidor.",
     };
   }
 
@@ -107,7 +106,7 @@ export async function requireStaff(): Promise<AuthGuardResult> {
     return {
       ok: false,
       authConfigured: true,
-      error: "Debes iniciar sesión con Google para continuar.",
+      error: "Debes iniciar sesión con tu correo y contraseña para continuar.",
     };
   }
 

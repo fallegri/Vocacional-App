@@ -95,11 +95,39 @@ ALTER TABLE cohort_groups
 -- Usuarios de la aplicación (app_users)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS app_users (
-    id            TEXT PRIMARY KEY,
-    email         TEXT NOT NULL,
-    display_name  TEXT NOT NULL,
-    role          TEXT NOT NULL,
-    cohort_code   TEXT,
-    auth_provider TEXT DEFAULT 'GOOGLE',
-    institution   TEXT
+    id                TEXT PRIMARY KEY,
+    email             TEXT NOT NULL,
+    display_name      TEXT NOT NULL,
+    role              TEXT NOT NULL,
+    cohort_code       TEXT,
+    auth_provider     TEXT DEFAULT 'EMAIL',
+    institution       TEXT,
+    password_hash     TEXT,
+    email_verified_at BIGINT
 );
+
+-- Migraciones idempotentes para bases ya existentes.
+ALTER TABLE app_users
+    ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE app_users
+    ADD COLUMN IF NOT EXISTS email_verified_at BIGINT;
+
+-- Índice único en lower(email) para búsquedas case-insensitive y unicidad del correo.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_app_users_email_lower
+    ON app_users (lower(email));
+
+-- ---------------------------------------------------------------------------
+-- Tokens de verificación de correo electrónico (email_verification_tokens)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+    token       TEXT PRIMARY KEY,
+    email       TEXT NOT NULL,
+    purpose     TEXT NOT NULL DEFAULT 'VERIFY_EMAIL',
+    created_at  BIGINT NOT NULL,
+    expires_at  BIGINT NOT NULL,
+    consumed_at BIGINT
+);
+
+-- Índice para búsquedas por correo (p.ej. listar tokens pendientes de un usuario).
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_email
+    ON email_verification_tokens (email);
