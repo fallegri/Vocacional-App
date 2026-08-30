@@ -42,10 +42,12 @@ defecto** y su comportamiento, puntajes y vista de resultados no cambian.
 | **RIASEC** |  60   | Likert-5 (1 = Nada … 5 = Mucho)                          | Puntaje 0–100 por dimensión (R, I, A, S, E, C); calidad por pares espejo/tiempos.            | Código dominante + radar + emparejamiento de 16 carreras + informe IA.         |
 | **CHASIDE**|  98   | Dicotómica: **Sí** (1) / **No** (0)                      | Conteo de "Sí" por área (7 áreas C, H, A, S, I, D, E), separando **Interés** (máx. 10) y **Aptitud** (máx. 4). | Dos áreas de mayor interés + alineación **Interés-vs-Aptitud**.                |
 | **TIPOV**  |  66   | Likert-3: **Me agrada** (3) / **Me es indiferente** (2) / **Me desagrada** (1) | Suma cruda por dimensión (13 dimensiones de interés) y valor normalizado 0–100.              | Dimensiones de interés dominantes.                                             |
+| **CIP-R**  |  114  | Opción única: **Agrado** (2) / **Indiferencia** (1) / **Desagrado** (0)        | Suma cruda por escala (agregación sobre 15 escalas primarias de interés) y valor normalizado 0–100. | Escalas de interés dominantes + barras por dimensión.                          |
 
-> Los bancos de ítems de CHASIDE y TIPOV son **adaptaciones originales y fieles**
-> a la estructura y puntuación descritas en la documentación de cada método (los
-> documentos aportan la estructura/calificación, no la redacción textual).
+> Los bancos de ítems de CHASIDE, TIPOV y CIP-R son **adaptaciones originales y
+> fieles** a la estructura y puntuación descritas en la documentación de cada
+> método (los documentos aportan la estructura/calificación, no la redacción
+> textual).
 
 ### Cómo se elige el método
 
@@ -67,7 +69,7 @@ defecto** y su comportamiento, puntajes y vista de resultados no cambian.
   antiguas) y `method_scores` (**JSONB** con los puntajes por dimensión, los
   códigos dominantes y la interpretación). Para RIASEC se siguen escribiendo las
   columnas `r/i/a/s/e/c`, `dominant_code` y `dominant_summary` como siempre; para
-  CHASIDE/TIPOV esas columnas quedan en `0` y los puntajes reales viven en
+  CHASIDE/TIPOV/CIP-R esas columnas quedan en `0` y los puntajes reales viven en
   `method_scores`.
 - `cohort_groups` guarda `method_id` (el método asignado al grupo).
 - Ambas columnas se agregan con migraciones **idempotentes**
@@ -96,14 +98,15 @@ conocimiento.
 - **RIASEC / Holland** (ya existente, método por defecto).
 - **CHASIDE** (`skills/knowledge/metodo-chaside.md`).
 - **TIPOV** (`skills/knowledge/test-tipov.md`).
+- **CIP-R** (`skills/knowledge/cuestionario-cip-r.md`).
 
 **De referencia / base de conocimiento** (no implementados como tests
 interactivos en esta etapa), con el motivo:
 
-- **CIP-R** (`skills/knowledge/cuestionario-cip-r.md`) y **Test Magdalena
-  Contreras / Lizarazo** (`skills/knowledge/test-magdalena-contreras.md`): son
-  cuestionarios autoaplicados **implementables**, pero **no incluidos en esta
-  etapa** (posible trabajo futuro).
+- **Test Magdalena Contreras / Lizarazo**
+  (`skills/knowledge/test-magdalena-contreras.md`): es un cuestionario
+  autoaplicado **implementable**, pero **no incluido en esta etapa** (posible
+  trabajo futuro).
 - **Instrumento de Autoorientación**
   (`skills/knowledge/instrumento-autoorientacion.md`): es un **marco compuesto /
   triangular** (CIP II + DAT + IHE), no un cuestionario de un solo puntaje

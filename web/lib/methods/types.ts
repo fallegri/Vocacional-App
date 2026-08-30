@@ -7,7 +7,7 @@
 // ===========================================================================
 
 /** Identificadores de los métodos vocacionales disponibles. */
-export type MethodId = "RIASEC" | "CHASIDE" | "TIPOV";
+export type MethodId = "RIASEC" | "CHASIDE" | "TIPOV" | "CIPR";
 
 /** Una dimensión (o escala/área) de un método vocacional. */
 export interface MethodDimension {

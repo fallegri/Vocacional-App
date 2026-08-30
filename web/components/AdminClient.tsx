@@ -22,6 +22,7 @@ const METHOD_OPTIONS: Array<{ id: MethodId; name: string }> = [
   { id: "RIASEC", name: "RIASEC (Holland)" },
   { id: "CHASIDE", name: "CHASIDE" },
   { id: "TIPOV", name: "TIPOV" },
+  { id: "CIPR", name: "CIP-R" },
 ];
 
 const REVIEW_STATUS_CODES = Object.keys(REVIEW_STATUS) as ReviewStatusCode[];

@@ -12,12 +12,13 @@ import type { AssessmentAnswer } from "@/lib/riasec/types";
 import type { MethodAnswer } from "@/lib/methods/types";
 
 describe("method registry", () => {
-  it("contains RIASEC, CHASIDE and TIPOV", () => {
+  it("contains RIASEC, CHASIDE, TIPOV and CIPR", () => {
     const ids = listMethods().map((m) => m.id).sort();
-    expect(ids).toEqual(["CHASIDE", "RIASEC", "TIPOV"]);
+    expect(ids).toEqual(["CHASIDE", "CIPR", "RIASEC", "TIPOV"]);
     expect(METHODS.RIASEC).toBeDefined();
     expect(METHODS.CHASIDE).toBeDefined();
     expect(METHODS.TIPOV).toBeDefined();
+    expect(METHODS.CIPR).toBeDefined();
   });
 
   it("uses RIASEC as the default method", () => {
@@ -34,11 +35,13 @@ describe("method registry", () => {
     expect(getMethod("RIASEC").questions).toHaveLength(60);
     expect(getMethod("CHASIDE").questions).toHaveLength(98);
     expect(getMethod("TIPOV").questions).toHaveLength(66);
+    expect(getMethod("CIPR").questions).toHaveLength(114);
   });
 
   it("normalizeMethodId falls back to RIASEC for unknown/absent input", () => {
     expect(normalizeMethodId("CHASIDE")).toBe("CHASIDE");
     expect(normalizeMethodId("tipov")).toBe("TIPOV");
+    expect(normalizeMethodId("cipr")).toBe("CIPR");
     expect(normalizeMethodId("riasec")).toBe("RIASEC");
     expect(normalizeMethodId("unknown")).toBe("RIASEC");
     expect(normalizeMethodId(undefined)).toBe("RIASEC");

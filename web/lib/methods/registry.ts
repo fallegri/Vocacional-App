@@ -23,6 +23,12 @@ import {
   TIPOV_QUESTIONS,
 } from "@/lib/methods/tipov/data";
 import { scoreTipov } from "@/lib/methods/tipov/engine";
+import {
+  CIPR_DIMENSIONS,
+  CIPR_SCALES_ORDER,
+  CIPR_QUESTIONS,
+} from "@/lib/methods/cipr/data";
+import { scoreCipr } from "@/lib/methods/cipr/engine";
 
 const CHASIDE_SCALE: ResponseScale = {
   kind: "DICHOTOMOUS",
@@ -38,6 +44,17 @@ const TIPOV_SCALE: ResponseScale = {
     { value: 3, label: "Me agrada" },
     { value: 2, label: "Me es indiferente" },
     { value: 1, label: "Me desagrada" },
+  ],
+};
+
+// Opciones ordenadas de mayor a menor atracción para que coincidan con el
+// mapeo del motor (Agrado = 2, Indiferencia = 1, Desagrado = 0).
+const CIPR_SCALE: ResponseScale = {
+  kind: "LIKERT_3",
+  options: [
+    { value: 2, label: "Agrado" },
+    { value: 1, label: "Indiferencia" },
+    { value: 0, label: "Desagrado" },
   ],
 };
 
@@ -67,6 +84,19 @@ const TIPOV_METHOD: VocationalMethod = {
   score: scoreTipov,
 };
 
+const CIPR_METHOD: VocationalMethod = {
+  id: "CIPR",
+  name: "CIP-R",
+  shortDescription:
+    "Cuestionario de Intereses Profesionales Revisado que mide 15 escalas primarias de interés mediante una escala de opción única de agrado (Agrado / Indiferencia / Desagrado).",
+  origin:
+    "Diseñado por Hermelinda Fogliatto (1991, 1993) y revisado por Fogliatto, Pérez, Olaz y Parodi (2003) en Argentina; instrumento local del Cono Sur para jóvenes desde los 15-17 años.",
+  dimensions: CIPR_SCALES_ORDER.map((scale) => CIPR_DIMENSIONS[scale]),
+  questions: CIPR_QUESTIONS,
+  scale: CIPR_SCALE,
+  score: scoreCipr,
+};
+
 /** Método por defecto de la aplicación. */
 export const DEFAULT_METHOD_ID: MethodId = "RIASEC";
 
@@ -75,6 +105,7 @@ export const METHODS: Record<MethodId, VocationalMethod> = {
   RIASEC: RIASEC_METHOD,
   CHASIDE: CHASIDE_METHOD,
   TIPOV: TIPOV_METHOD,
+  CIPR: CIPR_METHOD,
 };
 
 /** Devuelve el método por su identificador. */
@@ -94,7 +125,12 @@ export function listMethods(): VocationalMethod[] {
 export function normalizeMethodId(value: unknown): MethodId {
   if (typeof value === "string") {
     const upper = value.toUpperCase();
-    if (upper === "RIASEC" || upper === "CHASIDE" || upper === "TIPOV") {
+    if (
+      upper === "RIASEC" ||
+      upper === "CHASIDE" ||
+      upper === "TIPOV" ||
+      upper === "CIPR"
+    ) {
       return upper as MethodId;
     }
   }
