@@ -7,7 +7,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "OrientApp | Diagnóstico Vocacional RIASEC",
   description:
-    "Plataforma de diagnóstico vocacional RIASEC (Holland) con orientación asistida por IA.",
+    "Plataforma de diagnóstico vocacional que calcula resultados de forma determinista según el método aplicado (RIASEC, CHASIDE, TIPOV, CIP-R, Magdalena Contreras).",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -21,7 +21,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <nav>
             <Link href="/assessment">Evaluación</Link>
             <Link href="/careers">Carreras</Link>
-            <Link href="/tutor">Tutor IA</Link>
             <Link href="/admin">Administración</Link>
           </nav>
           <AuthControls />

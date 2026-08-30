@@ -1,0 +1,41 @@
+{
+  "id": "FEAT-001",
+  "type": "refactor",
+  "description": "Confirm green baseline, then REMOVE the RAG/AI machinery so the vocational analysis is produced ENTIRELY by the deterministic method engines (no LLM, no retrieval, no embeddings). Delete the AI advisor/report, the Tutor chat, the knowledge base (pgvector) ingestion+retrieval+embeddings, the AI config, and all their routes/UI/tests/schema. Keep the 5 deterministic method engines (RIASEC/CHASIDE/TIPOV/CIP-R/Magdalena) and their tests fully intact and green. The bibliography files at repo-root skills/knowledge/*.md STAY (they document the methods and are the source of the interpretation text). This feature is a prerequisite for FEAT-002 (auth) and FEAT-003 (groups+email).",
+  "status": "in_progress",
+  "steps": [
+    "Setup: export NVM_DIR=\"$HOME/.nvm\"; . \"$NVM_DIR/nvm.sh\"; nvm use 22; cd web; npm install. Confirm green baseline: npm run typecheck, npm run lint, npm run test -- --run (155 tests), and no-env build (env -u DATABASE_URL -u AUTH_SECRET -u GOOGLE_CLIENT_ID npm run build).",
+    "Delete AI modules: web/lib/ai/client.ts, web/lib/ai/config.ts, web/lib/ai/prompts.ts, web/lib/actions/ai-config.ts.",
+    "Delete knowledge/RAG modules: web/lib/knowledge/chunk.ts, web/lib/knowledge/ingest.ts, web/lib/knowledge/retrieve.ts, web/lib/knowledge/sources.ts, and web/scripts/ingest-knowledge.ts. Remove the knowledge:ingest script from web/package.json.",
+    "Delete API routes: web/app/api/ai/chat/route.ts, web/app/api/ai/report/route.ts (remove the app/api/ai directory), and web/app/api/knowledge/route.ts.",
+    "Delete admin/AI/knowledge pages: web/app/admin/ai-settings/page.tsx, web/app/admin/knowledge/page.tsx, web/app/tutor/page.tsx.",
+    "Delete client components: web/components/AiReportClient.tsx, web/components/AiSettingsClient.tsx, web/components/KnowledgeAdminClient.tsx, web/components/TutorChatClient.tsx.",
+    "Update web/app/layout.tsx: remove the 'Tutor IA' nav <Link href=\"/tutor\">. Update the metadata description to drop 'orientación asistida por IA' wording (Spanish, describe deterministic vocational diagnosis instead).",
+    "Update web/app/results/[sessionId]/page.tsx: remove the import and usage of AiReportClient and BOTH 'Conversar con el Tutor IA' links (RIASEC branch and GenericMethodResults branch). The RIASEC branch must still show radar, dimensions, dominant profile (session.dominantSummary) and career matches. The generic branch must still show dimension bars, Interes-vs-Aptitud panel and the deterministic 'Interpretación' (ms.interpretation) which comes from the method engine. Do NOT call any LLM anywhere in the results path.",
+    "Update web/lib/sessions.ts: remove aiAnalysis from StoredSession and stop selecting/returning ai_analysis in loadSession (the column is being dropped from schema in this feature). Adjust any type references. Do NOT change method_scores handling.",
+    "Update web/lib/riasec/types.ts: remove the aiAnalysis field from DiagnosticResult if present, and update the STUDENT role description text that mentions 'Tutor IA' to Spanish text describing deterministic results only. Keep USER_ROLES codes unchanged in this feature (role changes happen in FEAT-002).",
+    "Update web/db/schema.sql: remove the RAG section (knowledge_documents, knowledge_chunks, their indexes and the uq_knowledge_documents_source_key migration), remove the ai_config table + its security-note comment, remove the ai_analysis column from assessment_sessions (both the CREATE TABLE column and any ALTER referencing it), and remove `CREATE EXTENSION IF NOT EXISTS vector;` (pgvector no longer needed). Keep assessment_sessions/assessment_responses/cohort_groups. Keep all remaining statements idempotent (IF NOT EXISTS).",
+    "Delete now-obsolete tests: web/tests/ai-client.test.ts, web/tests/knowledge-sources.test.ts, web/tests/knowledge.test.ts, web/tests/tutor-prompt.test.ts. If web/tests/read-access-routes.test.ts references /api/ai or /api/knowledge, prune those specific cases while keeping the /api/sessions and /results read-access assertions meaningful.",
+    "Grep the web/ tree (excluding node_modules and .next) for any remaining references to lib/ai, lib/knowledge, /api/ai, /api/knowledge, aiAnalysis, ai_analysis, ai_config, Tutor, retrieve, embedding, pgvector, vector( and fix or remove them so nothing dangling remains.",
+    "Re-run verification: npm run typecheck, npm run lint, npm run test -- --run, and the no-env build. All must pass."
+  ],
+  "acceptance_criteria": [
+    "No file under web/lib/ai, web/lib/knowledge, web/app/api/ai, web/app/api/knowledge, web/app/admin/ai-settings, web/app/admin/knowledge, web/app/tutor exists; the listed AI/knowledge components and ai-config action are deleted.",
+    "web/db/schema.sql contains no vector extension, no knowledge_documents/knowledge_chunks, no ai_config table, and no ai_analysis column; remaining statements are idempotent.",
+    "web/package.json no longer has the knowledge:ingest script.",
+    "The results page and /api/sessions produce the vocational report purely from the deterministic method engines; no LLM/retrieval/embedding call remains anywhere in web/ (grep confirms).",
+    "The 5 method engines and their tests (engine, chaside-engine, cipr-engine, tipov-engine, magdalena-engine, method-registry, qr) still pass unchanged.",
+    "Repo-root skills/knowledge/*.md files are untouched and still present.",
+    "npm run typecheck, npm run lint, npm run test -- --run all pass, and env -u DATABASE_URL -u AUTH_SECRET -u GOOGLE_CLIENT_ID npm run build succeeds."
+  ],
+  "verification": [
+    "cd web && npm run typecheck",
+    "cd web && npm run lint",
+    "cd web && npm run test -- --run",
+    "cd web && env -u DATABASE_URL -u AUTH_SECRET -u GOOGLE_CLIENT_ID npm run build",
+    "grep -rE 'lib/ai|lib/knowledge|api/ai|api/knowledge|ai_analysis|ai_config|Tutor|retrieveRelevantPassages|embedding|CREATE EXTENSION .*vector|vector\\(' web/app web/lib web/components web/scripts web/db web/tests  (expect no functional matches)",
+    "ls skills/knowledge (bibliography .md files still present)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -172,7 +172,7 @@ export const USER_ROLES: Record<UserRoleCode, UserRoleMeta> = {
     code: "SUPER_ADMIN",
     title: "Admin Principal",
     description:
-      "Acceso total al sistema, auditoría global, gestión de instituciones y configuración de IA",
+      "Acceso total al sistema, auditoría global, gestión de instituciones y configuración general",
     badgeIcon: "👑",
     isStaff: true,
   },
@@ -196,7 +196,7 @@ export const USER_ROLES: Record<UserRoleCode, UserRoleMeta> = {
     code: "STUDENT",
     title: "Estudiante",
     description:
-      "Toma de diagnósticos vocacionales RIASEC, acceso a resultados y Tutor IA personalizado",
+      "Toma de diagnósticos vocacionales y acceso a sus resultados deterministas calculados según el método aplicado",
     badgeIcon: "🎓",
     isStaff: false,
   },

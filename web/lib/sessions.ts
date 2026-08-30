@@ -45,7 +45,6 @@ export interface StoredSession {
   warningMessage: string | null;
   topCareerTitle: string | null;
   topCareerAffinity: number | null;
-  aiAnalysis: string | null;
   cohortCode: string | null;
   studentName: string | null;
   studentEmail: string | null;
@@ -288,7 +287,7 @@ export async function loadSession(
     `SELECT id, started_at, completed_at, is_valid, reliability_level,
             r_score, i_score, a_score, s_score, e_score, c_score,
             dominant_code, dominant_summary, warning_message,
-            top_career_title, top_career_affinity, ai_analysis,
+            top_career_title, top_career_affinity,
             cohort_code, student_name, student_email, review_status,
             method_id, method_scores
        FROM assessment_sessions
@@ -324,7 +323,6 @@ export async function loadSession(
     topCareerTitle: str(row.top_career_title),
     topCareerAffinity:
       row.top_career_affinity == null ? null : num(row.top_career_affinity),
-    aiAnalysis: str(row.ai_analysis),
     cohortCode: str(row.cohort_code),
     studentName: str(row.student_name),
     studentEmail: str(row.student_email),

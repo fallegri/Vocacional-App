@@ -3,10 +3,10 @@ import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 // ===========================================================================
 // Pruebas de CABLEADO (integración a nivel de ruta) de la autorización de
 // LECTURA. A diferencia de read-access.test.ts (que prueba authorizeSessionRead
-// en aislamiento), estas pruebas invocan los handlers/página REALES y verifican
-// que cada superficie protegida RECHAZA a un llamador no-dueño / anónimo. Su
-// objetivo es fallar en CI si alguien elimina una llamada a la guarda de una
-// ruta concreta (regresión que las pruebas unitarias de la política no detectan).
+// en aislamiento), estas pruebas invocan la página REAL de resultados y
+// verifican que rechaza a un llamador no-dueño / anónimo. Su objetivo es fallar
+// en CI si alguien elimina la llamada a la guarda de esa superficie protegida
+// (regresión que las pruebas unitarias de la política no detectan).
 //
 // Estrategia de mocks (misma que auth-roles/read-access):
 //  - Mock mínimo de "next-auth", "next-auth/providers/google" y
@@ -16,8 +16,7 @@ import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 //    resto de @/lib/auth/session (y la lógica REAL de authorizeSessionRead,
 //    isStaffRole, isAuthConfigured leyendo env) permanece real: si se quita una
 //    guarda, la prueba correspondiente falla.
-//  - Mock de @/lib/sessions (loadSession) y @/lib/knowledge/ingest
-//    (listDocuments) para no tocar la base de datos.
+//  - Mock de @/lib/sessions (loadSession) para no tocar la base de datos.
 //  - NO se mockean las guardas de autorización: son el objeto bajo prueba.
 // ===========================================================================
 
@@ -56,7 +55,6 @@ const OTHER_OWNER_SESSION = {
   warningMessage: null,
   topCareerTitle: null,
   topCareerAffinity: null,
-  aiAnalysis: null,
   cohortCode: null,
   studentName: "Otro Alumno",
   studentEmail: "dueno@x.com",
@@ -69,27 +67,6 @@ vi.mock("@/lib/sessions", () => ({
   loadSession: (id: string) => loadSessionImpl(id),
 }));
 
-vi.mock("@/lib/knowledge/ingest", () => ({
-  listDocuments: async () => [{ id: 1, title: "Doc secreto" }],
-  KNOWLEDGE_SOURCE_TYPES: { BOOK: "Libro", RESEARCH: "Inv.", ARTICLE: "Art." },
-  ingestDocument: async () => ({ ok: true }),
-}));
-
-// La IA se considera configurada para que el chat/report avancen hasta la
-// guarda de lectura (si no, /api/ai/chat corta antes con 503 por falta de IA).
-vi.mock("@/lib/ai/config", () => ({
-  resolveAiConfig: async () => ({
-    baseUrl: "https://ai",
-    apiKey: "k",
-    model: "m",
-  }),
-  isConfigured: () => true,
-  EMBEDDING_DIMENSION: 1536,
-}));
-
-import { POST as reportPost } from "@/app/api/ai/report/route";
-import { POST as chatPost } from "@/app/api/ai/chat/route";
-import { GET as knowledgeGet } from "@/app/api/knowledge/route";
 import ResultsPage from "@/app/results/[sessionId]/page";
 import AccessRestricted from "@/components/AccessRestricted";
 
@@ -109,14 +86,6 @@ function configureOAuth() {
   process.env.AUTH_SECRET = "test-auth-secret";
 }
 
-function jsonRequest(body: unknown): Request {
-  return new Request("https://x/api", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
 beforeEach(() => {
   for (const k of ENV_KEYS) delete process.env[k];
   currentUser = null;
@@ -128,72 +97,6 @@ afterEach(() => {
     if (ORIGINAL[k] === undefined) delete process.env[k];
     else process.env[k] = ORIGINAL[k];
   }
-});
-
-// ===========================================================================
-// POST /api/ai/report
-// ===========================================================================
-describe("POST /api/ai/report (cableado de la guarda de lectura)", () => {
-  it("rechaza con 403 a un estudiante que no es dueño de la sesión", async () => {
-    configureOAuth();
-    currentUser = { email: "intruso@x.com", role: "STUDENT" };
-    const res = await reportPost(jsonRequest({ sessionId: "sess-1" }));
-    expect(res.status).toBe(403);
-    const data = (await res.json()) as { error?: string };
-    expect(data.error).toBeTruthy();
-  });
-
-  it("rechaza con 403 a un usuario anónimo (OAuth configurado)", async () => {
-    configureOAuth();
-    currentUser = null;
-    const res = await reportPost(jsonRequest({ sessionId: "sess-1" }));
-    expect(res.status).toBe(403);
-  });
-});
-
-// ===========================================================================
-// POST /api/ai/chat
-// ===========================================================================
-describe("POST /api/ai/chat (cableado de la guarda de lectura)", () => {
-  it("rechaza con 403 a un estudiante que no es dueño cuando adjunta sessionId", async () => {
-    configureOAuth();
-    currentUser = { email: "intruso@x.com", role: "STUDENT" };
-    const res = await chatPost(
-      jsonRequest({ message: "Hola", sessionId: "sess-1" })
-    );
-    expect(res.status).toBe(403);
-  });
-
-  it("devuelve 500 (no degrada en silencio) si loadSession falla al cargar", async () => {
-    configureOAuth();
-    currentUser = { email: "dueno@x.com", role: "STUDENT" };
-    loadSessionImpl = async () => {
-      throw new Error("fallo de base de datos");
-    };
-    const res = await chatPost(
-      jsonRequest({ message: "Hola", sessionId: "sess-1" })
-    );
-    expect(res.status).toBe(500);
-  });
-});
-
-// ===========================================================================
-// GET /api/knowledge
-// ===========================================================================
-describe("GET /api/knowledge (cableado de la guarda de personal)", () => {
-  it("rechaza con 403 a un estudiante (rol no staff)", async () => {
-    configureOAuth();
-    currentUser = { email: "alumno@x.com", role: "STUDENT" };
-    const res = await knowledgeGet(new Request("https://x/api/knowledge"));
-    expect(res.status).toBe(403);
-  });
-
-  it("rechaza con 403 a un usuario anónimo (OAuth configurado)", async () => {
-    configureOAuth();
-    currentUser = null;
-    const res = await knowledgeGet(new Request("https://x/api/knowledge"));
-    expect(res.status).toBe(403);
-  });
 });
 
 // ===========================================================================

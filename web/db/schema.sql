@@ -2,14 +2,14 @@
 -- OrientApp - Esquema autoritativo de Neon Postgres
 -- ---------------------------------------------------------------------------
 -- Espeja las entidades Room de la app Android
--- (app/src/main/java/com/example/data/local/entities/AssessmentEntities.kt)
--- y añade la base de conocimiento (RAG) con pgvector.
+-- (app/src/main/java/com/example/data/local/entities/AssessmentEntities.kt).
+--
+-- El análisis vocacional es DETERMINISTA: lo calculan los motores de método
+-- (RIASEC/CHASIDE/TIPOV/CIP-R/Magdalena) en web/lib/methods/*. No hay IA,
+-- recuperación ni embeddings, por lo que no se requiere pgvector.
 --
 -- Ejecutar contra la base Neon una sola vez (o mediante migración).
 -- ===========================================================================
-
--- pgvector: requerido para los embeddings de la base de conocimiento (RAG).
-CREATE EXTENSION IF NOT EXISTS vector;
 
 -- ---------------------------------------------------------------------------
 -- Sesiones de evaluación (assessment_sessions)
@@ -31,7 +31,6 @@ CREATE TABLE IF NOT EXISTS assessment_sessions (
     warning_message     TEXT,
     top_career_title    TEXT,
     top_career_affinity REAL,
-    ai_analysis         TEXT,
     -- Campos de cohorte y estudiante
     cohort_code         TEXT,
     student_name        TEXT,
@@ -74,23 +73,6 @@ CREATE INDEX IF NOT EXISTS idx_assessment_responses_question_id
     ON assessment_responses (question_id);
 
 -- ---------------------------------------------------------------------------
--- Configuración de IA (ai_config) - fila única id = 1
--- NOTA DE SEGURIDAD: api_key se guarda EN CLARO (sin cifrado en reposo). Para
--- producción, prefiere configurar la clave con la variable de entorno
--- AI_API_KEY (tiene prioridad y no queda en la base). Si usas esta tabla,
--- restringe el acceso a la base y considera cifrado a nivel de columna o un
--- gestor de secretos. Ver web/README.md > "API key de IA en reposo".
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS ai_config (
-    id            INT PRIMARY KEY DEFAULT 1,
-    provider_type TEXT NOT NULL,
-    base_url      TEXT NOT NULL,
-    api_key       TEXT NOT NULL,
-    model_name    TEXT NOT NULL,
-    temperature   REAL DEFAULT 0.7
-);
-
--- ---------------------------------------------------------------------------
 -- Cohortes / grupos de encuesta (cohort_groups)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS cohort_groups (
@@ -121,50 +103,3 @@ CREATE TABLE IF NOT EXISTS app_users (
     auth_provider TEXT DEFAULT 'GOOGLE',
     institution   TEXT
 );
-
--- ===========================================================================
--- Base de conocimiento (RAG) - libros, investigaciones científicas, etc.
--- ===========================================================================
-
--- Documento fuente subido por el personal (staff).
-CREATE TABLE IF NOT EXISTS knowledge_documents (
-    id               BIGSERIAL PRIMARY KEY,
-    title            TEXT NOT NULL,
-    source_type      TEXT NOT NULL,      -- p.ej. 'BOOK', 'RESEARCH', 'ARTICLE'
-    source_reference TEXT,               -- cita/URL/ISBN
-    created_at       BIGINT NOT NULL,
-    created_by       TEXT,
-    -- Clave estable de origen (slug del archivo fuente) para deduplicar la
-    -- ingesta idempotente. Nullable: los documentos subidos manualmente por el
-    -- personal quedan con source_key NULL. Postgres permite múltiples NULL en
-    -- un índice único, así que las filas previas no se ven afectadas.
-    source_key       TEXT
-);
-
--- Migración idempotente para bases existentes: añade source_key sin reescribir
--- columnas previas y crea el índice único que garantiza un solo documento por
--- clave de origen. El script de ingesta borra por source_key antes de reinsertar.
-ALTER TABLE knowledge_documents
-    ADD COLUMN IF NOT EXISTS source_key TEXT;
-CREATE UNIQUE INDEX IF NOT EXISTS uq_knowledge_documents_source_key
-    ON knowledge_documents (source_key);
-
--- Fragmentos (chunks) con embeddings para búsqueda semántica.
--- La dimensión 1536 corresponde a text-embedding-3-small de OpenAI.
-CREATE TABLE IF NOT EXISTS knowledge_chunks (
-    id          BIGSERIAL PRIMARY KEY,
-    document_id BIGINT NOT NULL REFERENCES knowledge_documents (id) ON DELETE CASCADE,
-    chunk_index INT NOT NULL,
-    content     TEXT NOT NULL,
-    embedding   vector(1536),
-    created_at  BIGINT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_document_id
-    ON knowledge_chunks (document_id);
-
--- Índice ANN para similitud coseno sobre los embeddings.
--- HNSW ofrece buen recall/latencia; alternativamente puede usarse ivfflat.
--- (Crear tras cargar datos si se prefiere ivfflat con lists ajustadas.)
-CREATE INDEX IF NOT EXISTS idx_knowledge_chunks_embedding_hnsw
-    ON knowledge_chunks USING hnsw (embedding vector_cosine_ops);

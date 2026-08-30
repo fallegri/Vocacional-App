@@ -1,0 +1,7 @@
+{
+  "task_id": "task-credentials-auth-and-deterministic-analysis",
+  "task_description": "Pivot OrientApp web: (A) make the vocational analysis fully deterministic via the 5 method engines and REMOVE the RAG/AI-advisor machinery (embeddings, retrieval, Tutor, AI report, ai_config, pgvector). (B) Replace Google OAuth with self-hosted email+password auth with email verification (Resend), bcrypt password hashing, Auth.js v5 Credentials + JWT sessions, DB-backed roles in Neon, a seeded initial admin, admin-assigned roles (default STUDENT). (C) Rename cohorts to free-text-named GROUPS keeping anonymous group-student entry (email-only) and QR->assigned-method routing, add Resend results emails, and update docs. Work on branch feat/web-migration-vercel-neon; do not push. Keep Spanish UI, no-env build invariant, and method-engine tests green.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}

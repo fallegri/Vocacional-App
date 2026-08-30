@@ -1,6 +1,5 @@
 import Link from "next/link";
 import RadarChart from "@/components/RadarChart";
-import AiReportClient from "@/components/AiReportClient";
 import AccessRestricted from "@/components/AccessRestricted";
 import {
   loadSession,
@@ -116,9 +115,7 @@ export default async function ResultsPage({
   // construida a partir de method_scores (sin radar/carreras/AI RIASEC).
   // ---------------------------------------------------------------------
   if (session.methodId !== "RIASEC") {
-    return (
-      <GenericMethodResults session={session} sessionId={sessionId} />
-    );
+    return <GenericMethodResults session={session} />;
   }
 
   const matches = matchCareers(session.scores, CAREERS);
@@ -193,19 +190,6 @@ export default async function ResultsPage({
         <p style={{ marginBottom: 0 }}>{session.dominantSummary}</p>
       </div>
 
-      {/* Informe del Asesor IA (bajo demanda, fundamentado en la base de conocimiento) */}
-      <div className="card" style={{ marginTop: 16 }}>
-        <AiReportClient sessionId={session.id} initialAnalysis={session.aiAnalysis} />
-        <div className="center" style={{ marginTop: 16 }}>
-          <Link
-            href={`/tutor?session=${encodeURIComponent(session.id)}`}
-            className="btn btn-secondary"
-          >
-            Conversar con el Tutor IA
-          </Link>
-        </div>
-      </div>
-
       {/* Ranking de carreras */}
       <div className="card" style={{ marginTop: 16 }}>
         <h2 style={{ marginTop: 0 }}>Carreras con mayor afinidad</h2>
@@ -258,10 +242,8 @@ export default async function ResultsPage({
  */
 function GenericMethodResults({
   session,
-  sessionId,
 }: {
   session: StoredSession;
-  sessionId: string;
 }) {
   const ms = session.methodScores;
 
@@ -373,15 +355,6 @@ function GenericMethodResults({
         <p style={{ marginBottom: 0 }}>
           {ms.interpretation || session.dominantSummary || "Sin interpretación disponible."}
         </p>
-      </div>
-
-      <div className="card center" style={{ marginTop: 16 }}>
-        <Link
-          href={`/tutor?session=${encodeURIComponent(sessionId)}`}
-          className="btn btn-secondary"
-        >
-          Conversar con el Tutor IA
-        </Link>
       </div>
     </main>
   );
