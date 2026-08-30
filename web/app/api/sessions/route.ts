@@ -228,5 +228,46 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
+  // Envío best-effort del correo con los resultados al estudiante.
+  // Un fallo en el envío NO afecta la respuesta 201: siempre se devuelve el id.
+  if (ownerEmail) {
+    try {
+      const { sendResultsEmailTo } = await import("@/lib/email/client");
+
+      // Determinar la URL base para el enlace de resultados.
+      const forwardedHost = request.headers.get("x-forwarded-host");
+      const host = request.headers.get("host");
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim();
+      const origin =
+        appUrl ||
+        (forwardedHost ? `https://${forwardedHost}` : null) ||
+        (host ? `https://${host}` : "http://localhost:3000");
+
+      const resultsUrl = `${origin}/results/${id}`;
+
+      // Determinar nombre del método.
+      const method = getMethod(methodId);
+      const methodName = method.name;
+
+      // Interpretación determinista: preferir la del motor de método, si no la
+      // descripción del perfil dominante RIASEC.
+      const interpretation =
+        methodScores?.interpretation || dominantSummary || dominantCode;
+
+      await sendResultsEmailTo(ownerEmail, {
+        studentName: body.studentName ?? undefined,
+        methodName,
+        dominantCode,
+        interpretation,
+        resultsUrl,
+      });
+    } catch (emailErr) {
+      console.error(
+        "[api/sessions] Error al enviar correo de resultados (no afecta la sesión):",
+        emailErr
+      );
+    }
+  }
+
   return NextResponse.json({ id }, { status: 201 });
 }

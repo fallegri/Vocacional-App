@@ -1,42 +1,53 @@
 # OrientApp
 
-Aplicación de diagnóstico vocacional **RIASEC** (modelo de Holland). Este
-repositorio contiene dos versiones de la aplicación:
+Aplicacion de **diagnostico vocacional determinista**. Este repositorio contiene
+dos versiones:
 
-- **`app/`** — Aplicación **Android** nativa original (Kotlin / Jetpack Compose /
+- **`app/`** - Aplicacion **Android** nativa original (Kotlin / Jetpack Compose /
   Room). Se conserva intacta como referencia.
-- **`web/`** — Aplicación **web** desplegable, migración de la app Android a
-  **Next.js 15 (App Router) + TypeScript**, alojable en **Vercel** con **Neon**
-  (Postgres serverless + `pgvector`).
+- **`web/`** - Aplicacion **web** desplegable en **Vercel + Neon** (Postgres
+  serverless). Esta es la version activa.
 
-## ¿Qué versión usar?
+## Nota de rediseno de arquitectura
 
-Para desarrollar, ejecutar o desplegar la aplicación web, consulta
-[`web/README.md`](web/README.md). Ahí encontrarás:
+La version web fue rediseniada en 2024-2025 con los siguientes cambios:
 
-- Cómo correr la app en local (`npm install`, `npm run dev`).
+- **Se elimino:** el Tutor IA, el Asesor IA, la base de conocimiento RAG,
+  pgvector, y la autenticacion con Google OAuth.
+- **Se agrego:** 4 nuevos motores de evaluacion vocacional deterministas
+  (CHASIDE, TIPOV, CIP-R, Test Magdalena Contreras), autenticacion
+  email + contrasena con verificacion via Resend, modelo de roles basado en
+  base de datos (Admin / Tester / Profesor / Revisor / Estudiante), y flujo
+  anonimo para estudiantes de grupo via codigo QR.
+- **El analisis vocacional es 100% determinista:** los resultados se calculan
+  mediante algoritmos puros definidos en `web/lib/methods/`. No se usa ningun
+  LLM ni servicio externo de IA.
+
+## ?Que version usar?
+
+Para desarrollar, ejecutar o desplegar la aplicacion web, consulta
+[`web/README.md`](web/README.md). Ahi encontraras:
+
+- Como correr la app en local.
 - La lista completa de variables de entorno.
-- Cómo provisionar Neon y habilitar `pgvector`.
-- Cómo aplicar el esquema (`web/db/schema.sql`) y sembrar la base
-  (`npm run db:seed`).
-- Los pasos de despliegue en Vercel (Root Directory = `web`).
+- Como provisionar Neon y aplicar el esquema.
+- Como sembrar el admin inicial (`npm run db:seed`).
+- Los pasos de despliegue en Vercel.
 
-## Novedades de la versión web
+## Metodos vocacionales incluidos
 
-Además de portar fielmente el motor psicométrico, el test de 60 preguntas, los
-resultados con radar, el emparejamiento de carreras y el asesor IA, la versión
-web añade:
+| Metodo | Descripcion |
+|---|---|
+| **RIASEC** (Holland) | Motor original de 6 dimensiones, 60 preguntas, gráfico radar y matching de 16 carreras |
+| **CHASIDE** | 7 areas, 98 items dicotomicos, comparacion Interes vs. Aptitud |
+| **TIPOV** | 13 dimensiones de interes, 66 items Likert-3 |
+| **CIP-R** | 15 escalas primarias, 114 items de agrado/indiferencia/desagrado |
+| **Test Magdalena Contreras** | 10 campos de trabajo, 120 items con doble escala (Interes + Aptitud) |
 
-1. **Base de conocimiento (RAG)**: el personal puede subir libros,
-   investigaciones científicas y artículos que se indexan con embeddings en Neon
-   `pgvector` para fundamentar las respuestas del Tutor IA con citas.
-2. **Códigos QR por grupo de encuesta**: al crear un nuevo grupo/cohorte se
-   genera automáticamente un código QR que lleva al formulario del test
-   vocacional asignado a ese grupo (`/g/{CODIGO}`), listo para compartir o
-   imprimir.
+## Documentacion tecnica
 
-El documento de diseño está en [`SDD_ORIENTAPP_V2.md`](SDD_ORIENTAPP_V2.md).
+El documento de diseno original esta en [`SDD_ORIENTAPP_V2.md`](SDD_ORIENTAPP_V2.md).
+Ten en cuenta que refleja el diseno anterior (con Google OAuth y Tutor IA).
+La arquitectura actual se describe en [`web/README.md`](web/README.md).
 
-> Nota: la app no tiene OAuth real todavía; usa usuarios semilla y un selector de
-> rol. Consulta la sección de autenticación en [`web/README.md`](web/README.md)
-> antes de exponer el panel de administración públicamente.
+La bibliografia de los metodos vocacionales esta en `skills/knowledge/*.md`.

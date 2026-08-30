@@ -1,72 +1,92 @@
 // ===========================================================================
-// Cliente de correo electrónico (Resend).
+// Cliente de correo electrónico usando el SDK oficial de Resend.
 //
-// FEAT-002: módulo básico que registra el intento de envío.
-// FEAT-003: conectará Resend real usando RESEND_API_KEY / EMAIL_FROM.
+// INVARIANTE DE BUILD: RESEND_API_KEY y EMAIL_FROM se leen en tiempo de
+// petición (lazy). Si no están definidas, el envío queda silenciado (skipped)
+// con un log en español, lo que permite que `next build` pase sin secretos y
+// que la app funcione en modo demo/desarrollo sin configuración de correo.
 //
-// INVARIANTE DE BUILD: RESEND_API_KEY se lee en tiempo de petición (lazy).
-// Si no está definida, el envío queda como "stub" (solo log), lo que permite
-// que `next build` pase sin secretos.
+// Nada se ejecuta al importar el módulo.
 // ===========================================================================
+
+import { Resend } from "resend";
+import type {
+  ResultsEmailParams,
+  VerificationEmailParams,
+} from "@/lib/email/messages";
+import {
+  buildVerificationEmail,
+  buildResultsEmail,
+} from "@/lib/email/messages";
 
 export interface EmailPayload {
   to: string;
   subject: string;
   html: string;
+  /** Cuerpo en texto plano (opcional). */
+  text?: string;
 }
 
 export interface EmailResult {
-  ok: boolean;
+  sent: boolean;
+  skipped?: boolean;
   error?: string;
 }
 
 /**
- * Envía un correo electrónico usando Resend.
+ * Devuelve true si tanto RESEND_API_KEY como EMAIL_FROM están definidos y no
+ * están vacíos. No lanza; no lee nada al cargar el módulo.
+ */
+export function isEmailConfigured(): boolean {
+  return (
+    (process.env.RESEND_API_KEY ?? "").trim().length > 0 &&
+    (process.env.EMAIL_FROM ?? "").trim().length > 0
+  );
+}
+
+/**
+ * Envía un correo electrónico usando el SDK de Resend.
  *
- * Si RESEND_API_KEY no está definida, actúa como stub: registra el intento
- * por consola y devuelve ok:true (modo demo/desarrollo).
- *
- * En FEAT-003 este cliente se reemplaza/amplía con la integración real.
+ * - Si RESEND_API_KEY o EMAIL_FROM no están definidos, registra un mensaje en
+ *   español y devuelve { sent: false, skipped: true }. No lanza ningún error.
+ * - Si el envío falla, registra el error en español y devuelve
+ *   { sent: false, error: <mensaje> }. No lanza ningún error.
+ * - Si el envío tiene éxito, devuelve { sent: true }.
  */
 export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
-  const apiKey = (process.env.RESEND_API_KEY ?? "").trim();
-
-  if (!apiKey) {
+  if (!isEmailConfigured()) {
     console.log(
-      `[email/stub] Se enviaría correo a: ${payload.to} | Asunto: ${payload.subject}`
+      `[email] Correo no configurado (falta RESEND_API_KEY / EMAIL_FROM). Se omite el envío a: ${payload.to} | Asunto: ${payload.subject}`
     );
-    return { ok: true };
+    return { sent: false, skipped: true };
   }
 
-  // Integración real con Resend (activada en FEAT-003 cuando RESEND_API_KEY está definida).
-  try {
-    const from =
-      (process.env.EMAIL_FROM ?? "").trim() ||
-      "OrientApp <noreply@orientapp.local>";
+  const apiKey = process.env.RESEND_API_KEY!.trim();
+  const from =
+    (process.env.EMAIL_FROM ?? "").trim() ||
+    "OrientApp <noreply@orientapp.local>";
 
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: [payload.to],
-        subject: payload.subject,
-        html: payload.html,
-      }),
+  try {
+    const resend = new Resend(apiKey);
+    const result = await resend.emails.send({
+      from,
+      to: [payload.to],
+      subject: payload.subject,
+      html: payload.html,
+      ...(payload.text ? { text: payload.text } : {}),
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      return { ok: false, error: `Resend error ${response.status}: ${text}` };
+    if (result.error) {
+      const msg = result.error.message ?? JSON.stringify(result.error);
+      console.error(`[email] Error al enviar a ${payload.to}: ${msg}`);
+      return { sent: false, error: msg };
     }
 
-    return { ok: true };
+    return { sent: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: msg };
+    console.error(`[email] Excepción al enviar correo a ${payload.to}: ${msg}`);
+    return { sent: false, error: msg };
   }
 }
 
@@ -75,26 +95,38 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
  *
  * @param email Correo del destinatario.
  * @param token Token de verificación a incluir en el enlace.
+ * @param displayName Nombre visible del usuario (opcional).
  */
 export async function sendVerificationEmail(
   email: string,
-  token: string
+  token: string,
+  displayName?: string
 ): Promise<EmailResult> {
   const baseUrl =
-    (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() ||
-    "http://localhost:3000";
+    (process.env.NEXT_PUBLIC_APP_URL ?? "").trim() || "http://localhost:3000";
 
   const verifyUrl = `${baseUrl}/verify?token=${encodeURIComponent(token)}`;
 
-  return sendEmail({
-    to: email,
-    subject: "Confirma tu cuenta en OrientApp",
-    html: `
-      <h2>Bienvenido a OrientApp</h2>
-      <p>Gracias por registrarte. Para activar tu cuenta, haz clic en el siguiente enlace:</p>
-      <p><a href="${verifyUrl}" style="font-size:16px;font-weight:bold;">Verificar mi cuenta</a></p>
-      <p>Este enlace expira en 24 horas.</p>
-      <p>Si no creaste esta cuenta, puedes ignorar este mensaje.</p>
-    `,
-  });
+  const params: VerificationEmailParams = {
+    displayName,
+    verifyUrl,
+  };
+
+  const { subject, html, text } = buildVerificationEmail(params);
+
+  return sendEmail({ to: email, subject, html, text });
+}
+
+/**
+ * Envía el correo con los resultados del diagnóstico vocacional al estudiante.
+ * Versión con dirección de correo del destinatario explícita.
+ * Se llama de forma best-effort tras persistir la sesión: los errores se
+ * registran pero no afectan la respuesta HTTP del servidor.
+ */
+export async function sendResultsEmailTo(
+  to: string,
+  params: ResultsEmailParams
+): Promise<EmailResult> {
+  const { subject, html, text } = buildResultsEmail(params);
+  return sendEmail({ to, subject, html, text });
 }

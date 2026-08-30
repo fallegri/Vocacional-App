@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "feat",
   "description": "Add the Resend email module (confirmation emails + results emails), wire the results email into the deterministic assessment flow, align the cohort concept to free-text-named GROUPS (grupo/evento/colegio) while preserving the anonymous group-student flow and the QR->assigned-method routing, add ADMIN user role management to the admin panel, and update the docs. Depends on FEAT-001 (RAG removed) and FEAT-002 (credentials auth + roles + seed).",
-  "status": "pending",
+  "status": "in_progress",
   "steps": [
     "Add dep in web/: npm install resend.",
     "Create web/lib/email/client.ts (or web/lib/email.ts): a LAZY Resend client that reads RESEND_API_KEY and EMAIL_FROM at call time. Export isEmailConfigured() (true iff RESEND_API_KEY and EMAIL_FROM set) and a low-level sendEmail({to, subject, html, text}) that: if not configured, does NOT throw - it logs a clear Spanish message and returns {sent:false, skipped:true} so the app degrades gracefully and the no-env build/runtime never crash. When configured, calls resend.emails.send and returns {sent:true}. Nothing runs at import; no top-level env read.",

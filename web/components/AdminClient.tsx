@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import QrCode from "@/components/QrCode";
 import { createCohort } from "@/lib/actions/cohorts";
+import { setUserRole } from "@/lib/actions/users";
 import { buildCohortTestUrl, normalizeCohortCode } from "@/lib/qr";
 import { DEFAULT_USERS } from "@/data/seed";
 import {
@@ -14,10 +15,11 @@ import {
 } from "@/lib/riasec/types";
 import type { SessionSummary } from "@/lib/sessions";
 import type { MethodId } from "@/lib/methods/types";
+import type { AppUserSummary } from "@/lib/actions/users";
 
-type TabKey = "evaluaciones" | "cohortes" | "usuarios";
+type TabKey = "evaluaciones" | "grupos" | "usuarios";
 
-/** Métodos disponibles para asignar a una cohorte (nombre visible en español). */
+/** Métodos disponibles para asignar a un grupo (nombre visible en español). */
 const METHOD_OPTIONS: Array<{ id: MethodId; name: string }> = [
   { id: "RIASEC", name: "RIASEC (Holland)" },
   { id: "CHASIDE", name: "CHASIDE" },
@@ -27,6 +29,15 @@ const METHOD_OPTIONS: Array<{ id: MethodId; name: string }> = [
 ];
 
 const REVIEW_STATUS_CODES = Object.keys(REVIEW_STATUS) as ReviewStatusCode[];
+
+/** Roles disponibles para asignar desde el panel de admin. */
+const ROLE_OPTIONS: Array<{ code: UserRoleCode; label: string }> = [
+  { code: "SUPER_ADMIN", label: "Admin Principal" },
+  { code: "TEST_ADMIN", label: "Admin de Test" },
+  { code: "PROFESOR", label: "Profesor" },
+  { code: "REPORT_REVIEWER", label: "Revisor de Reportes" },
+  { code: "STUDENT", label: "Estudiante" },
+];
 
 function formatDate(ms: number | null): string {
   if (!ms) return "Sin fecha";
@@ -43,21 +54,40 @@ function formatDate(ms: number | null): string {
   }
 }
 
+/**
+ * Genera un código slug a partir de un texto libre.
+ * Toma hasta los primeros 16 caracteres alfanuméricos (en mayúsculas),
+ * reemplaza espacios y guiones con "_", elimina el resto y añade un sufijo
+ * aleatorio de 4 caracteres para evitar colisiones.
+ */
+function slugifyCode(text: string): string {
+  const base = text
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_")
+    .replace(/[^A-Z0-9_]/g, "")
+    .slice(0, 16);
+  const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return base ? `${base}_${suffix}` : suffix;
+}
+
 export default function AdminClient({
   initialCohorts,
   initialSessions,
+  initialUsers,
   currentUser,
 }: {
   initialCohorts: CohortGroup[];
   initialSessions: SessionSummary[];
+  /** Lista inicial de usuarios del sistema (puede estar vacía). */
+  initialUsers: AppUserSummary[];
   /**
-   * Identidad real del usuario autenticado (email + rol) cuando OAuth está
-   * configurado. En modo demo (sin OAuth) es null y se muestra el selector de
-   * rol de prueba heredado.
+   * Identidad real del usuario autenticado (email + rol) cuando la auth está
+   * configurada. En modo demo (sin credenciales) es null y se muestra el
+   * selector de rol de prueba heredado.
    */
   currentUser: { email: string; role: UserRoleCode } | null;
 }) {
-  // Selector de usuario/rol de PRUEBA: solo se usa en modo demo (sin OAuth).
+  // Selector de usuario/rol de PRUEBA: solo se usa en modo demo (sin auth).
   // Cuando hay sesión real (currentUser), la identidad y el rol vienen del
   // servidor y este selector no se muestra.
   const [activeUserId, setActiveUserId] = useState<string>(
@@ -69,15 +99,16 @@ export default function AdminClient({
     DEFAULT_USERS.find((u) => u.id === activeUserId) ?? DEFAULT_USERS[0];
 
   // Identidad efectiva: la sesión real si existe, si no el usuario de prueba.
-  const effectiveRole: UserRoleCode = currentUser?.role ?? demoUser.role;
-  const effectiveName = currentUser?.email ?? demoUser.displayName;
+  const effectiveRole: UserRoleCode = currentUser?.role ?? demoUser?.role ?? "STUDENT";
+  const effectiveName = currentUser?.email ?? demoUser?.displayName ?? "";
   const activeRole = USER_ROLES[effectiveRole];
   const canManageCohorts =
     effectiveRole === "SUPER_ADMIN" || effectiveRole === "TEST_ADMIN";
+  const canManageUsers = effectiveRole === "SUPER_ADMIN";
 
   const [tab, setTab] = useState<TabKey>("evaluaciones");
 
-  // ----- Estado de cohortes -----
+  // ----- Estado de grupos (cohortes) -----
   const [cohorts, setCohorts] = useState<CohortGroup[]>(initialCohorts);
   const [code, setCode] = useState("");
   const [title, setTitle] = useState("");
@@ -101,6 +132,14 @@ export default function AdminClient({
   const [reviewPending, setReviewPending] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
 
+  // ----- Estado de gestión de usuarios -----
+  const [users, setUsers] = useState<AppUserSummary[]>(initialUsers);
+  // Por fila: guardamos el rol seleccionado en el dropdown (draft).
+  const [roleDrafts, setRoleDrafts] = useState<Record<string, UserRoleCode>>({});
+  const [userSaving, setUserSaving] = useState<Record<string, boolean>>({});
+  const [userErrors, setUserErrors] = useState<Record<string, string | null>>({});
+  const [userNotices, setUserNotices] = useState<Record<string, string | null>>({});
+
   // Base absoluta para los enlaces del QR (segura en SSR y en cliente).
   const origin = useMemo(() => {
     if (typeof window !== "undefined") return window.location.origin;
@@ -109,7 +148,9 @@ export default function AdminClient({
 
   const linkFor = (c: string) => buildCohortTestUrl(c, origin);
 
-  const canSubmit = code.trim().length > 0 && title.trim().length > 0;
+  // El formulario puede enviarse siempre que haya título (el código se puede
+  // dejar vacío y se genera automáticamente).
+  const canSubmit = title.trim().length > 0;
 
   const filteredSessions = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -142,9 +183,14 @@ export default function AdminClient({
     if (!canSubmit) return;
     setPending(true);
 
-    const normalized = normalizeCohortCode(code);
+    // Si el código está vacío, auto-generamos un slug desde el título.
+    const rawCode = code.trim();
+    const resolvedCode = rawCode
+      ? normalizeCohortCode(rawCode)
+      : slugifyCode(title.trim());
+
     const result = await createCohort({
-      code: normalized,
+      code: resolvedCode,
       title: title.trim(),
       institution: institution.trim(),
       creatorName: effectiveName,
@@ -163,7 +209,7 @@ export default function AdminClient({
       );
 
     if (unauthorized) {
-      setError(result.error ?? "No estás autorizado para crear cohortes.");
+      setError(result.error ?? "No estás autorizado para crear grupos.");
       return;
     }
 
@@ -172,14 +218,14 @@ export default function AdminClient({
         `${result.error ?? "No se pudo guardar en la base de datos."} El código QR se generó de todas formas para su uso inmediato.`
       );
     } else {
-      setNotice(`Grupo ${normalized} creado correctamente.`);
+      setNotice(`Grupo ${resolvedCode} creado correctamente.`);
     }
 
     setCohorts((prev) => {
-      if (prev.some((c) => c.code === normalized)) return prev;
+      if (prev.some((c) => c.code === resolvedCode)) return prev;
       return [
         {
-          code: normalized,
+          code: resolvedCode,
           title: title.trim(),
           institution: institution.trim(),
           creatorName: effectiveName,
@@ -190,7 +236,7 @@ export default function AdminClient({
         ...prev,
       ];
     });
-    setJustCreated(normalized);
+    setJustCreated(resolvedCode);
     setCode("");
     setTitle("");
     setInstitution("");
@@ -256,6 +302,44 @@ export default function AdminClient({
     }
   };
 
+  const getRoleDraft = (user: AppUserSummary): UserRoleCode =>
+    roleDrafts[user.id] ?? user.role;
+
+  const handleRoleChange = (userId: string, role: UserRoleCode) => {
+    setRoleDrafts((prev) => ({ ...prev, [userId]: role }));
+  };
+
+  const handleSaveRole = async (user: AppUserSummary) => {
+    const newRole = getRoleDraft(user);
+    setUserSaving((prev) => ({ ...prev, [user.id]: true }));
+    setUserErrors((prev) => ({ ...prev, [user.id]: null }));
+    setUserNotices((prev) => ({ ...prev, [user.id]: null }));
+
+    const result = await setUserRole(user.email, newRole);
+
+    setUserSaving((prev) => ({ ...prev, [user.id]: false }));
+    if (result.ok) {
+      setUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...u, role: newRole } : u))
+      );
+      // Limpiar el draft al guardar correctamente.
+      setRoleDrafts((prev) => {
+        const next = { ...prev };
+        delete next[user.id];
+        return next;
+      });
+      setUserNotices((prev) => ({
+        ...prev,
+        [user.id]: `Rol actualizado a "${USER_ROLES[newRole].title}".`,
+      }));
+    } else {
+      setUserErrors((prev) => ({
+        ...prev,
+        [user.id]: result.error ?? "No se pudo actualizar el rol.",
+      }));
+    }
+  };
+
   const reviewSession = sessions.find((s) => s.id === reviewSessionId) ?? null;
 
   return (
@@ -299,8 +383,8 @@ export default function AdminClient({
         </div>
         <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
           {currentUser
-            ? "Sesión iniciada con Google. Tu rol determina las operaciones permitidas."
-            : "Selector de rol de demostración: la autenticación con Google no está configurada en este entorno."}
+            ? "Sesión iniciada con credenciales. Tu rol determina las operaciones permitidas."
+            : "Selector de rol de demostración: la autenticación con credenciales no está configurada en este entorno."}
         </p>
       </div>
 
@@ -315,17 +399,17 @@ export default function AdminClient({
         </button>
         <button
           type="button"
-          className={tab === "cohortes" ? "btn" : "btn btn-secondary"}
-          onClick={() => setTab("cohortes")}
+          className={tab === "grupos" ? "btn" : "btn btn-secondary"}
+          onClick={() => setTab("grupos")}
         >
-          Gestión de Cohortes
+          Gestión de Grupos
         </button>
         <button
           type="button"
           className={tab === "usuarios" ? "btn" : "btn btn-secondary"}
           onClick={() => setTab("usuarios")}
         >
-          Directorio de Usuarios
+          Usuarios
         </button>
       </div>
 
@@ -374,7 +458,7 @@ export default function AdminClient({
             <div className="grid grid-2">
               <div>
                 <label className="label" htmlFor="admin-search">
-                  Buscar por estudiante, correo o código RIASEC
+                  Buscar por estudiante, correo o código
                 </label>
                 <input
                   id="admin-search"
@@ -386,7 +470,7 @@ export default function AdminClient({
               </div>
               <div>
                 <label className="label" htmlFor="admin-cohort-filter">
-                  Filtrar por cohorte
+                  Filtrar por grupo
                 </label>
                 <select
                   id="admin-cohort-filter"
@@ -394,10 +478,10 @@ export default function AdminClient({
                   value={cohortFilter}
                   onChange={(e) => setCohortFilter(e.target.value)}
                 >
-                  <option value="ALL">Todas las cohortes</option>
+                  <option value="ALL">Todos los grupos</option>
                   {cohorts.map((c) => (
                     <option key={c.code} value={c.code}>
-                      {c.code}
+                      {c.title ? `${c.title} (${c.code})` : c.code}
                     </option>
                   ))}
                 </select>
@@ -409,7 +493,7 @@ export default function AdminClient({
             <div className="card center">
               <p className="muted" style={{ margin: 0 }}>
                 No se encontraron evaluaciones con los filtros actuales. Realiza
-                un test o selecciona otra cohorte para ver los resultados.
+                un test o selecciona otro grupo para ver los resultados.
               </p>
             </div>
           ) : (
@@ -445,7 +529,7 @@ export default function AdminClient({
                           Método: {s.methodId}
                         </span>
                         <span className="badge">
-                          {s.cohortCode ?? "SIN COHORTE"}
+                          {s.cohortCode ?? "SIN GRUPO"}
                         </span>
                       </div>
                     </div>
@@ -540,11 +624,11 @@ export default function AdminClient({
         </div>
       ) : null}
 
-      {tab === "cohortes" ? (
+      {tab === "grupos" ? (
         <div className="stack" style={{ gap: 20 }}>
           {canManageCohorts ? (
             <div className="card">
-              <h2 style={{ marginTop: 0 }}>Crear nuevo grupo de encuesta</h2>
+              <h2 style={{ marginTop: 0 }}>Crear nuevo grupo</h2>
               <p className="muted" style={{ marginTop: 0 }}>
                 Al crear un grupo se genera automáticamente un código QR que
                 lleva al formulario del test vocacional asignado a ese grupo.
@@ -552,27 +636,27 @@ export default function AdminClient({
               <form className="stack" onSubmit={handleCreate}>
                 <div className="grid grid-2">
                   <div>
-                    <label className="label" htmlFor="cohort-code">
-                      Código único (ej. BIO-2026-C)
-                    </label>
-                    <input
-                      id="cohort-code"
-                      className="input"
-                      value={code}
-                      onChange={(e) => setCode(e.target.value.toUpperCase())}
-                      placeholder="ING-2026-A"
-                    />
-                  </div>
-                  <div>
                     <label className="label" htmlFor="cohort-title">
-                      Nombre del grupo / curso
+                      Nombre del grupo
                     </label>
                     <input
                       id="cohort-title"
                       className="input"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
-                      placeholder="6to A Ciencias"
+                      placeholder="6to A Ciencias · Evento 1 · Colegio San Martín"
+                    />
+                  </div>
+                  <div>
+                    <label className="label" htmlFor="cohort-code">
+                      Código del grupo (opcional, se genera automáticamente si se deja vacío)
+                    </label>
+                    <input
+                      id="cohort-code"
+                      className="input"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.toUpperCase())}
+                      placeholder="Se genera desde el nombre si no se especifica"
                     />
                   </div>
                   <div>
@@ -653,8 +737,8 @@ export default function AdminClient({
             </div>
           ) : (
             <div className="alert alert-warning" role="note">
-              Tu rol ({activeRole.title}) puede consultar las cohortes y sus
-              códigos QR, pero no crear nuevas.
+              Tu rol ({activeRole.title}) puede consultar los grupos y sus
+              códigos QR, pero no crear nuevos.
             </div>
           )}
 
@@ -719,40 +803,114 @@ export default function AdminClient({
 
       {tab === "usuarios" ? (
         <div className="card">
-          <h2 style={{ marginTop: 0 }}>Directorio de Usuarios</h2>
+          <h2 style={{ marginTop: 0 }}>Usuarios del sistema</h2>
           <p className="muted" style={{ marginTop: 0 }}>
-            Usuarios semilla del sistema. La autenticación real (OAuth) queda
-            fuera de alcance de esta etapa.
+            {canManageUsers
+              ? "Como administrador principal puedes cambiar el rol de cualquier usuario registrado. Los cambios se guardan en la base de datos."
+              : "Lista de usuarios registrados. Solo el administrador principal puede cambiar roles."}
           </p>
-          <div className="stack" style={{ gap: 10 }}>
-            {DEFAULT_USERS.map((u) => {
-              const role = USER_ROLES[u.role];
-              return (
-                <article key={u.id} className="card card-muted">
-                  <div
-                    className="row spread"
-                    style={{ alignItems: "center", flexWrap: "wrap", gap: 8 }}
-                  >
-                    <div className="row" style={{ gap: 10, alignItems: "center" }}>
-                      <span style={{ fontSize: 22 }}>{role.badgeIcon}</span>
-                      <div>
-                        <strong>{u.displayName}</strong>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          {u.email}
+
+          {users.length === 0 ? (
+            <div className="alert alert-warning" role="note">
+              No hay usuarios registrados en la base de datos o la base de datos
+              no está disponible. Ejecuta{" "}
+              <code>npm run db:seed</code> para crear el administrador inicial.
+            </div>
+          ) : (
+            <div className="stack" style={{ gap: 10 }}>
+              {users.map((u) => {
+                const roleMeta = USER_ROLES[u.role];
+                const draft = getRoleDraft(u);
+                const isDirty = draft !== u.role;
+                const saving = userSaving[u.id] ?? false;
+                const userError = userErrors[u.id] ?? null;
+                const userNotice = userNotices[u.id] ?? null;
+                return (
+                  <article key={u.id} className="card card-muted">
+                    <div
+                      className="row spread"
+                      style={{
+                        alignItems: "flex-start",
+                        flexWrap: "wrap",
+                        gap: 12,
+                      }}
+                    >
+                      <div className="row" style={{ gap: 10, alignItems: "center" }}>
+                        <span style={{ fontSize: 22 }}>{roleMeta.badgeIcon}</span>
+                        <div>
+                          <strong>{u.displayName}</strong>
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            {u.email}
+                          </div>
+                          <div className="muted" style={{ fontSize: 11 }}>
+                            Verificado:{" "}
+                            {u.emailVerifiedAt ? (
+                              <span style={{ color: "var(--accent-strong)" }}>Sí</span>
+                            ) : (
+                              <span style={{ color: "var(--warning)" }}>No</span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <span className="badge">{role.title}</span>
-                      <div className="muted" style={{ fontSize: 11 }}>
-                        {u.institution ?? "Sin institución"}
+
+                      <div
+                        className="row"
+                        style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}
+                      >
+                        {canManageUsers ? (
+                          <>
+                            <select
+                              className="select"
+                              value={draft}
+                              onChange={(e) =>
+                                handleRoleChange(u.id, e.target.value as UserRoleCode)
+                              }
+                              disabled={saving}
+                              style={{ minWidth: 180 }}
+                            >
+                              {ROLE_OPTIONS.map((opt) => (
+                                <option key={opt.code} value={opt.code}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className="btn"
+                              disabled={!isDirty || saving}
+                              onClick={() => handleSaveRole(u)}
+                            >
+                              {saving ? "Guardando…" : "Guardar"}
+                            </button>
+                          </>
+                        ) : (
+                          <span className="badge">{roleMeta.title}</span>
+                        )}
                       </div>
                     </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
+                    {userError ? (
+                      <div
+                        className="alert alert-warning"
+                        role="alert"
+                        style={{ marginTop: 8 }}
+                      >
+                        {userError}
+                      </div>
+                    ) : null}
+                    {userNotice ? (
+                      <div
+                        className="alert alert-ok"
+                        role="status"
+                        style={{ marginTop: 8 }}
+                      >
+                        {userNotice}
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : null}
 

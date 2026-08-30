@@ -82,27 +82,41 @@ export async function createCohort(input: {
   const description = (input.description ?? "").trim();
   const methodId = normalizeMethodId(input.methodId);
 
-  if (!code || !title) {
-    return { ok: false, error: "El código y el nombre del grupo son obligatorios." };
+  // Si el código está vacío, se deriva automáticamente desde el título.
+  // Formato: hasta 20 chars alfanuméricos+guión bajo en mayúsculas + "-" + 4 chars aleatorios.
+  const resolvedCode: string = code
+    ? code
+    : (() => {
+        const base = title
+          .toUpperCase()
+          .replace(/[\s-]+/g, "_")
+          .replace(/[^A-Z0-9_]/g, "")
+          .slice(0, 16);
+        const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+        return base ? `${base}_${suffix}` : suffix;
+      })();
+
+  if (!resolvedCode || !title) {
+    return { ok: false, error: "El nombre del grupo es obligatorio." };
   }
 
   try {
     const existing = await query(
       "SELECT code FROM cohort_groups WHERE code = $1 LIMIT 1",
-      [code]
+      [resolvedCode]
     );
     if (existing.length > 0) {
-      return { ok: false, error: `Ya existe un grupo con el código ${code}.` };
+      return { ok: false, error: `Ya existe un grupo con el código ${resolvedCode}.` };
     }
 
     await query(
       `INSERT INTO cohort_groups (
           code, title, institution, creator_name, created_at, is_active, description, method_id
        ) VALUES ($1, $2, $3, $4, $5, TRUE, $6, $7)`,
-      [code, title, institution, creatorName, Date.now(), description, methodId]
+      [resolvedCode, title, institution, creatorName, Date.now(), description, methodId]
     );
 
-    return { ok: true, code };
+    return { ok: true, code: resolvedCode };
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "No se pudo crear el grupo.";

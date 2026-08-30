@@ -76,7 +76,7 @@ export async function registerAction(params: {
   // Generar token de verificación y enviar correo de confirmación.
   try {
     const token = await createVerificationToken(email);
-    await sendVerificationEmail(email, token);
+    await sendVerificationEmail(email, token, displayName);
   } catch {
     // El registro se completó; el fallo del correo no debe bloquearlo.
     console.error("[registerAction] Error al enviar correo de verificación.");
