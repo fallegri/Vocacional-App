@@ -15,6 +15,13 @@
 //   4. Es IDEMPOTENTE: borra el documento existente con el mismo source_key
 //      (ON DELETE CASCADE elimina sus fragmentos) ANTES de reinsertar el
 //      documento y sus fragmentos, de modo que reejecutar nunca duplica.
+//      El source_key se persiste en el MISMO INSERT que crea el documento
+//      (vía ingestDocument({ sourceKey })), por lo que la fila nace ya
+//      "llaveada" de forma atómica. Así, aunque el proceso falle a mitad de
+//      camino, la próxima ejecución encuentra y borra esa fila llaveada en
+//      lugar de dejar un duplicado sin llave. (Una transacción única alrededor
+//      de borrar+insertar sería la opción totalmente atómica, pero llavear en
+//      el INSERT ya cierra la ventana de duplicación al reejecutar.)
 //   5. Reutiliza el pipeline existente ingestDocument(); si la IA no está
 //      configurada, los fragmentos se guardan con embedding NULL y se muestra
 //      una advertencia en español.
@@ -148,12 +155,17 @@ async function main(): Promise<void> {
       descriptor.slug,
     ]);
 
+    // Pasamos source_key a ingestDocument() para que la fila nazca ya llaveada
+    // en el MISMO INSERT (atómico). Combinado con el DELETE por source_key de
+    // arriba, esto hace la ingesta idempotente incluso si un paso posterior
+    // falla: la próxima ejecución borra la fila llaveada en lugar de duplicarla.
     const result = await ingestDocument({
       title: descriptor.title,
       sourceType: descriptor.sourceType,
       sourceReference: descriptor.sourceReference,
       content,
       createdBy: "ingest-script",
+      sourceKey: descriptor.slug,
     });
 
     if (!result.ok || result.documentId == null) {
@@ -161,12 +173,6 @@ async function main(): Promise<void> {
       summary.warnings.push(`${filename}: ${result.error ?? "error desconocido"}`);
       continue;
     }
-
-    // Marca el documento recién insertado con su source_key para la dedupe.
-    await query(`UPDATE knowledge_documents SET source_key = $1 WHERE id = $2`, [
-      descriptor.slug,
-      result.documentId,
-    ]);
 
     summary.documents += 1;
     summary.totalChunks += result.chunkCount ?? 0;

@@ -28,6 +28,16 @@ export interface IngestDocumentInput {
   sourceReference?: string | null;
   content: string;
   createdBy?: string | null;
+  /**
+   * Clave de deduplicación opcional (p. ej. el slug del archivo fuente). Cuando
+   * se proporciona, se persiste en el MISMO INSERT que crea el documento, de
+   * modo que la fila queda "llaveada" de forma atómica. Esto hace que el patrón
+   * "borrar por source_key + reinsertar" del script de ingesta sea idempotente
+   * incluso si un paso posterior falla: la próxima ejecución encontrará y
+   * borrará la fila llaveada en lugar de duplicarla. Por defecto es NULL, así
+   * que los llamadores existentes conservan su comportamiento.
+   */
+  sourceKey?: string | null;
 }
 
 export interface IngestResult {
@@ -100,12 +110,19 @@ export async function ingestDocument(
   }
 
   const now = Date.now();
+  const sourceKey = (input.sourceKey ?? "").trim() || null;
 
+  // Persistimos source_key en el MISMO INSERT (atómico): la fila nace ya
+  // llaveada. Así, si un paso posterior falla, la re-ejecución del script de
+  // ingesta (que borra por source_key antes de reinsertar) elimina la fila
+  // parcial en lugar de duplicarla. (Una transacción única alrededor de
+  // borrar+insertar sería la opción totalmente atómica, pero llavear en el
+  // INSERT ya cierra la ventana de duplicación al reejecutar.)
   const docRows = await query(
-    `INSERT INTO knowledge_documents (title, source_type, source_reference, created_at, created_by)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO knowledge_documents (title, source_type, source_reference, created_at, created_by, source_key)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING id`,
-    [title, sourceType, sourceReference, now, input.createdBy ?? null]
+    [title, sourceType, sourceReference, now, input.createdBy ?? null, sourceKey]
   );
   const documentId = Number(docRows[0]?.id);
   if (!Number.isFinite(documentId)) {
