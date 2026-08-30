@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "PART B (1/2): Implement CIP-R as a fully interactive, self-scored vocational method in the existing pluggable registry, following the CHASIDE/TIPOV pattern (data module + pure engine + real Vitest tests). CIP-R = 114 items, single-choice Agrado/Indiferencia/Desagrado response scale, 15 primary interest scales; scoring aggregates per-scale, dominant scales = highest.",
+  "status": "pending",
+  "steps": [
+    "Read skills/knowledge/cuestionario-cip-r.md for the authoritative structure: 114 reactives; response scale Agrado (A) / Indiferencia (I) / Desagrado (D); the 15 primary interest scales are exactly: Cálculo, Científica, Diseño, Tecnológica, Geoastronómica, Naturalista, Sanitaria, Asistencial, Jurídica, Económica, Comunicacional, Humanística, Artística, Musical, Lingüística. Use the doc's per-scale descriptions for each MethodDimension.shortDesc. Ages 15-17+.",
+    "Create web/lib/methods/cipr/data.ts following web/lib/methods/tipov/data.ts: define the 15 scale codes (e.g. CALCULO, CIENTIFICA, DISENO, TECNOLOGICA, GEOASTRONOMICA, NATURALISTA, SANITARIA, ASISTENCIAL, JURIDICA, ECONOMICA, COMUNICACIONAL, HUMANISTICA, ARTISTICA, MUSICAL, LINGUISTICA), a canonical order array, a CIPR_DIMENSIONS Record<code, MethodDimension> (title in Spanish, shortDesc from the doc, a color), and an ITEMS record mapping each scale to a set of item texts. Distribute the 114 items across the 15 scales to total EXACTLY 114 (e.g. mostly 8 items per scale = 120, adjust some scales down to hit 114 — pick a concrete faithful distribution and document it in a code comment). Item wording is an ADAPTATION: add a clear header comment (mirroring chaside/data.ts and tipov/data.ts) stating the doc defines structure+scoring but not a verbatim licensable item bank, so the reactives are an original faithful adaptation consistent with each scale's described activities. Build CIPR_QUESTIONS via a buildQuestions() that assigns correlative ids 1..114 in canonical scale order.",
+    "Create web/lib/methods/cipr/engine.ts with a PURE scoreCipr(answers): follow tipov/engine.ts. Response scale is single-choice Agrado/Indiferencia/Desagrado mapped to numeric values (choose a documented mapping, e.g. Agrado=2, Indiferencia=1, Desagrado=0, so higher = more attraction). Aggregate per scale by summing the mapped values of that scale's items; normalized value 0-100 = raw / (maxPerItem * itemCount) * 100. dominantCodes = the highest-scoring scales (top 3, tie-break by canonical order). Produce a Spanish dominantSummary and interpretation naming the dominant scales; handle the all-zero / no-answers case with a neutral Spanish message like the TIPOV engine does. Expose raw (sums + counts + the value mapping) for persistence/views.",
+    "Register CIP-R in web/lib/methods/registry.ts: extend MethodId in web/lib/methods/types.ts to include 'CIPR'; add a CIPR_SCALE ResponseScale of kind 'LIKERT_3' with options ordered to match the engine mapping and Spanish labels ('Agrado', 'Indiferencia', 'Desagrado'); build a CIPR_METHOD VocationalMethod (id 'CIPR', Spanish name 'CIP-R', shortDescription + origin from the doc: Fogliatto 1991/1993, revised Fogliatto, Pérez, Olaz & Parodi 2003, Cono Sur/Argentina); add it to the METHODS record; and add 'CIPR' to the accepted ids in normalizeMethodId (keep RIASEC as fallback for unknown).",
+    "Add CIP-R to the cohort method dropdown: add { id: 'CIPR', name: 'CIP-R' } to the METHOD_OPTIONS array in web/components/AdminClient.tsx so it is assignable per-cohort and flows through /g/[code] -> /assessment?cohort=CODE&method=CIPR. (The /assessment selector is populated from listMethods(), so it will appear there automatically.)",
+    "Add real (non-stub) Vitest tests web/tests/cipr-engine.test.ts following web/tests/chaside-engine.test.ts / tipov-engine.test.ts: assert the item bank has exactly 114 items with unique correlative ids 1..114; assert exactly 15 scales with the correct codes; assert the per-scale item counts sum to 114; assert scoreCipr sums the mapped response values per scale correctly for a crafted answer set; assert dominantCodes picks the highest scales with canonical tie-break; assert the neutral message for an all-Desagrado/empty set; assert raw survives JSON round-trip (method_scores JSONB persistence).",
+    "Update web/tests/method-registry.test.ts to reflect the new method: the sorted ids array now includes 'CIPR', METHODS.CIPR is defined, normalizeMethodId('cipr')==='CIPR', and getMethod('CIPR').questions has length 114. Keep the existing RIASEC/CHASIDE/TIPOV assertions.",
+    "Update web/README.md (Spanish): add CIP-R to the seleccionable-methods table (114 items; scale Agrado/Indiferencia/Desagrado; per-scale aggregation over 15 interest scales; dominant scales + per-dimension bars) and move CIP-R OUT of the 'De referencia / material de referencia' list into the 'Implementados como instrumentos interactivos' list, keeping the adaptation disclosure note."
+  ],
+  "acceptance_criteria": [
+    "getMethod('CIPR').questions has exactly 114 items with unique ids 1..114 across exactly 15 scales matching the doc's scale names.",
+    "scoreCipr aggregates per-scale sums correctly and returns dominantCodes ordered highest-first with canonical tie-break, plus a Spanish interpretation; the empty/all-lowest case returns a neutral Spanish message.",
+    "CIP-R appears in the /assessment method selector (via listMethods) and in the cohort method dropdown (AdminClient METHOD_OPTIONS), and a session with methodId 'CIPR' persists+scores through the existing generic branch in app/api/sessions/route.ts (r/i/a/s/e/c stay 0, method_scores populated).",
+    "web/tests/cipr-engine.test.ts and the updated web/tests/method-registry.test.ts pass.",
+    "web/README.md lists CIP-R as an interactive method with its scale/scoring/interpretation and adaptation disclosure.",
+    "typecheck, lint, vitest --run, and the no-env build all pass from web/."
+  ],
+  "verification": [
+    "From web/ (after sourcing nvm): npm run typecheck",
+    "npm run lint",
+    "npx vitest --run  (cipr-engine + updated method-registry tests pass; all prior tests still pass)",
+    "env -u DATABASE_URL -u AI_API_KEY npm run build"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

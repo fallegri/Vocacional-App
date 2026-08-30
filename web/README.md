@@ -332,6 +332,7 @@ Scripts disponibles:
 | `npm run typecheck` | Chequeo de tipos (`tsc --noEmit`).                       |
 | `npm test`          | Tests unitarios del motor psicométrico (Vitest).        |
 | `npm run db:seed`   | Aplica el esquema y siembra cohortes/usuarios en Neon.  |
+| `npm run knowledge:ingest` | Ingiere los documentos `skills/knowledge/*.md` en la base de conocimiento (RAG). |
 
 > El build y los tests **no** requieren base de datos ni claves de IA: todo el
 > acceso a Neon y a la IA es **perezoso** (las variables solo se leen al ejecutar
@@ -417,6 +418,39 @@ npm run db:seed
 - Carga automáticamente `web/.env.local` si existe.
 - Las inserciones usan `ON CONFLICT DO NOTHING`, así que ejecutarlo varias veces
   no duplica cohortes ni usuarios.
+
+### Ingerir la base de conocimiento (RAG)
+
+El script `web/scripts/ingest-knowledge.ts` ingiere los documentos fuente de
+`skills/knowledge/*.md` (un nivel por encima de `web/`) en la base de
+conocimiento (`knowledge_documents` / `knowledge_chunks`) reutilizando el
+pipeline existente `ingestDocument()`.
+
+```bash
+cd web
+# Requiere DATABASE_URL en web/.env.local (o en el entorno).
+# Para embeddings semánticos, configura además AI_API_KEY / AI_BASE_URL.
+npm run knowledge:ingest
+```
+
+- **Requiere `DATABASE_URL`.** Se lee **en tiempo de ejecución**; si no está
+  definida, muestra un mensaje claro en español y **sale sin tocar la base de
+  datos ni la red** (nunca corre durante el build).
+- **Embeddings:** si la IA está configurada (`AI_API_KEY` / `AI_BASE_URL`, con un
+  modelo de embeddings de dimensión 1536), cada fragmento se guarda con su
+  embedding. Si la IA **no** está configurada, los fragmentos se guardan con
+  `embedding NULL`: quedan almacenados pero **no** son recuperables por
+  similitud hasta configurar la IA y **reindexar** (basta volver a ejecutar
+  `npm run knowledge:ingest`).
+- **Idempotente:** es seguro reejecutarlo. Cada documento se identifica por un
+  `source_key` (slug estable derivado del nombre de archivo); antes de reinsertar
+  se borra el documento previo con ese `source_key` (sus fragmentos se eliminan
+  en cascada), de modo que reejecutar **no duplica** documentos.
+- **Solo `.md`:** únicamente se ingieren los documentos markdown. El PDF de
+  `skills/knowledge/` (`Diseño de un instrumento de orientación vocacional.pdf`)
+  **no** se ingiere en este paso; el script lo informa por consola.
+- Carga automáticamente `web/.env.local` si existe y aplica el esquema
+  (idempotente) antes de ingerir, de modo que la columna `source_key` exista.
 
 ## Despliegue en Vercel
 

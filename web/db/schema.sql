@@ -133,8 +133,21 @@ CREATE TABLE IF NOT EXISTS knowledge_documents (
     source_type      TEXT NOT NULL,      -- p.ej. 'BOOK', 'RESEARCH', 'ARTICLE'
     source_reference TEXT,               -- cita/URL/ISBN
     created_at       BIGINT NOT NULL,
-    created_by       TEXT
+    created_by       TEXT,
+    -- Clave estable de origen (slug del archivo fuente) para deduplicar la
+    -- ingesta idempotente. Nullable: los documentos subidos manualmente por el
+    -- personal quedan con source_key NULL. Postgres permite múltiples NULL en
+    -- un índice único, así que las filas previas no se ven afectadas.
+    source_key       TEXT
 );
+
+-- Migración idempotente para bases existentes: añade source_key sin reescribir
+-- columnas previas y crea el índice único que garantiza un solo documento por
+-- clave de origen. El script de ingesta borra por source_key antes de reinsertar.
+ALTER TABLE knowledge_documents
+    ADD COLUMN IF NOT EXISTS source_key TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_knowledge_documents_source_key
+    ON knowledge_documents (source_key);
 
 -- Fragmentos (chunks) con embeddings para búsqueda semántica.
 -- La dimensión 1536 corresponde a text-embedding-3-small de OpenAI.

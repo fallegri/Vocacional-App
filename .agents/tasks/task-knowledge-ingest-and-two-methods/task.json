@@ -1,0 +1,7 @@
+{
+  "task_id": "task-knowledge-ingest-and-two-methods",
+  "task_description": "Two approved follow-ups on branch feat/web-migration-vercel-neon (extends open PR #1): PART A — add a repeatable, idempotent RAG ingestion script that loads the uploaded skills/knowledge/*.md docs into the Neon pgvector knowledge base via the existing ingestDocument() pipeline, degrading cleanly when DATABASE_URL/AI are unset and never running during build. PART B — implement CIP-R (114 items, Agrado/Indiferencia/Desagrado, 15 interest scales) and Test Magdalena Contreras/Lizarazo (dual Interés+Aptitud, 10 campos x 6 x 2 = 120 items, 0-4 scale, interpretation bands) as fully interactive self-scored methods in the existing pluggable registry, flowing through the /assessment selector and per-cohort QR flow. Keep all user-facing text in Spanish and preserve the no-env build invariant.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}

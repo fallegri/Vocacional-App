@@ -9,7 +9,8 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
-    "db:seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts"
+    "db:seed": "tsx --env-file-if-exists=.env.local scripts/seed.ts",
+    "knowledge:ingest": "tsx --env-file-if-exists=.env.local scripts/ingest-knowledge.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
