@@ -9,6 +9,6 @@
     "tests": "pass",
     "test_quality": "pass",
     "docker_build": "skipped",
-    "summary": "174 Vitest tests green (17 files, +9 new), tsc --noEmit clean, next lint 0 warnings/errors, no-env build succeeds with DATABASE_URL/AUTH_SECRET/RESEND_API_KEY/EMAIL_FROM all unset. Review fixup commit 9615ab5 on feat/web-migration-vercel-neon addresses all 5 review issues: (1) dead now variable removed from createUser, (2) SUPER_ADMIN self-demotion guard added in setUserRole, (3) consumeVerificationToken made atomic with single UPDATE...RETURNING, (4) NEXT_PUBLIC_APP_URL fallback logs Spanish warning + marked as REQUIRED in .env.example, (5) registerAction handles existing-unverified accounts by resending token."
+    "summary": "175 Vitest tests green (17 files, 3 reviews APPROVED), tsc --noEmit clean, next lint 0 warnings/errors, no-env build succeeds with DATABASE_URL/AUTH_SECRET/RESEND_API_KEY/EMAIL_FROM all unset. v1-v3 review cycle complete: all 8 issues (5 v1 + 3 v2) addressed; v3 rendered APPROVED with no blocking concerns. Notable: password reset is documented-but-unimplemented follow-up (explicitly out of scope)."
   }
 }
