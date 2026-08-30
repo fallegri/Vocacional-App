@@ -235,13 +235,17 @@ export async function POST(request: Request) {
       const { sendResultsEmailTo } = await import("@/lib/email/client");
 
       // Determinar la URL base para el enlace de resultados.
-      const forwardedHost = request.headers.get("x-forwarded-host");
+      // Se usa NEXT_PUBLIC_APP_URL (configurado en producción) o el header Host
+      // controlado por el servidor. Se excluye x-forwarded-host porque es un
+      // header controlable por el cliente y podría usarse para inyectar un
+      // dominio de phishing en el correo del estudiante.
       const host = request.headers.get("host");
       const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim();
       const origin =
         appUrl ||
-        (forwardedHost ? `https://${forwardedHost}` : null) ||
-        (host ? `https://${host}` : "http://localhost:3000");
+        (host && host !== "localhost:3000" && !host.startsWith("localhost")
+          ? `https://${host}`
+          : "http://localhost:3000");
 
       const resultsUrl = `${origin}/results/${id}`;
 

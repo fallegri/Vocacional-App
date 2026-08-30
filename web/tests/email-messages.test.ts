@@ -123,4 +123,17 @@ describe("buildResultsEmail", () => {
     expect(result.html.length).toBeGreaterThan(0);
     expect(result.text.length).toBeGreaterThan(0);
   });
+
+  it("escapa correctamente un studentName con etiquetas HTML (<script>)", () => {
+    const { html } = buildResultsEmail({
+      ...baseParams,
+      studentName: '<script>alert("xss")</script>',
+    });
+    // El HTML no debe contener la etiqueta <script> sin escapar.
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain("</script>");
+    // Debe contener los caracteres escapados.
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).toContain("&lt;/script&gt;");
+  });
 });

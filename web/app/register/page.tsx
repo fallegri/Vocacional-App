@@ -4,15 +4,24 @@
 // Muestra un formulario con nombre, correo y contraseña. Al enviarlo se llama
 // a registerAction (server action). Si el registro es exitoso, indica al
 // usuario que revise su correo para confirmar la cuenta.
+//
+// Cuando se navega con ?resend=1 (desde el aviso de cuenta no verificada en el
+// inicio de sesión), el encabezado cambia a "Reenviar correo de verificación"
+// para reflejar que se reenviará el enlace a una cuenta existente no verificada.
 // ===========================================================================
 
 "use client";
 
 import { useState, useTransition } from "react";
+import { useSearchParams } from "next/navigation";
 import { registerAction } from "@/lib/actions/auth";
 import Link from "next/link";
+import { Suspense } from "react";
 
-export default function RegisterPage() {
+function RegisterForm() {
+  const searchParams = useSearchParams();
+  const isResend = searchParams.get("resend") === "1";
+
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,7 +39,9 @@ export default function RegisterPage() {
   if (result?.ok) {
     return (
       <main style={{ maxWidth: 420, margin: "60px auto", padding: "0 16px" }}>
-        <h1 style={{ fontSize: 22, marginBottom: 12 }}>¡Cuenta creada!</h1>
+        <h1 style={{ fontSize: 22, marginBottom: 12 }}>
+          {isResend ? "¡Correo reenviado!" : "¡Cuenta creada!"}
+        </h1>
         <p style={{ lineHeight: 1.6 }}>
           Revisa tu correo <strong>{email}</strong> y haz clic en el enlace de
           confirmación para activar tu cuenta.
@@ -46,7 +57,15 @@ export default function RegisterPage() {
 
   return (
     <main style={{ maxWidth: 420, margin: "60px auto", padding: "0 16px" }}>
-      <h1 style={{ fontSize: 22, marginBottom: 20 }}>Crear cuenta</h1>
+      <h1 style={{ fontSize: 22, marginBottom: isResend ? 8 : 20 }}>
+        {isResend ? "Reenviar correo de verificación" : "Crear cuenta nueva"}
+      </h1>
+      {isResend && (
+        <p style={{ fontSize: 14, color: "#6B7280", marginBottom: 16, lineHeight: 1.5 }}>
+          Ingresa los datos de tu cuenta existente. Te enviaremos un nuevo enlace
+          de verificación a tu correo.
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -104,7 +123,9 @@ export default function RegisterPage() {
           className="btn btn-primary"
           style={{ marginTop: 4 }}
         >
-          {isPending ? "Registrando..." : "Crear cuenta"}
+          {isPending
+            ? isResend ? "Reenviando..." : "Registrando..."
+            : isResend ? "Reenviar enlace de verificación" : "Crear cuenta"}
         </button>
       </form>
 
@@ -115,5 +136,13 @@ export default function RegisterPage() {
         </Link>
       </p>
     </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={null}>
+      <RegisterForm />
+    </Suspense>
   );
 }

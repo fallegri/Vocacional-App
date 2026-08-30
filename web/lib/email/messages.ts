@@ -7,6 +7,20 @@
 // Esto las hace fáciles de probar unitariamente.
 // ===========================================================================
 
+/**
+ * Escapa caracteres especiales de HTML para evitar inyección de HTML en
+ * plantillas de correo electrónico.
+ * Convierte &, <, >, ", ' a sus entidades HTML correspondientes.
+ */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 export interface VerificationEmailParams {
   /** Nombre visible del usuario (opcional). */
   displayName?: string;
@@ -29,7 +43,9 @@ export function buildVerificationEmail(
   params: VerificationEmailParams
 ): VerificationEmailContent {
   const { displayName, verifyUrl } = params;
-  const greeting = displayName ? `Hola, ${displayName}` : "Hola";
+  const safeDisplayName = displayName ? escapeHtml(displayName) : undefined;
+  const safeVerifyUrl = escapeHtml(verifyUrl);
+  const greeting = safeDisplayName ? `Hola, ${safeDisplayName}` : "Hola";
 
   const subject = "Confirma tu cuenta en OrientApp";
 
@@ -42,14 +58,14 @@ export function buildVerificationEmail(
   <p>Gracias por registrarte en OrientApp. Para activar tu cuenta y comenzar a
      usar el sistema de orientación vocacional, haz clic en el botón de abajo:</p>
   <p style="text-align:center;margin:32px 0;">
-    <a href="${verifyUrl}"
+    <a href="${safeVerifyUrl}"
        style="background:#4F46E5;color:#fff;padding:14px 28px;text-decoration:none;
               border-radius:6px;font-size:16px;font-weight:bold;display:inline-block;">
       Verificar mi cuenta
     </a>
   </p>
   <p>O copia y pega este enlace en tu navegador:</p>
-  <p style="word-break:break-all;font-size:13px;color:#555;">${verifyUrl}</p>
+  <p style="word-break:break-all;font-size:13px;color:#555;">${safeVerifyUrl}</p>
   <p><strong>Este enlace expira en 24 horas.</strong></p>
   <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
   <p style="font-size:12px;color:#888;">
@@ -105,7 +121,13 @@ export function buildResultsEmail(
   const { studentName, methodName, dominantCode, interpretation, resultsUrl } =
     params;
 
-  const greeting = studentName ? `Hola, ${studentName}` : "Hola";
+  const safeStudentName = studentName ? escapeHtml(studentName) : undefined;
+  const safeMethodName = escapeHtml(methodName);
+  const safeDominantCode = escapeHtml(dominantCode);
+  const safeInterpretation = escapeHtml(interpretation);
+  const safeResultsUrl = escapeHtml(resultsUrl);
+
+  const greeting = safeStudentName ? `Hola, ${safeStudentName}` : "Hola";
   const subject = "Tus resultados de orientación vocacional en OrientApp";
 
   const html = `<!DOCTYPE html>
@@ -115,28 +137,28 @@ export function buildResultsEmail(
   <h2 style="color:#4F46E5;">Tus resultados vocacionales</h2>
   <p>${greeting},</p>
   <p>Has completado el diagnóstico vocacional con el método
-     <strong>${methodName}</strong>. A continuación encontrarás un resumen
+     <strong>${safeMethodName}</strong>. A continuación encontrarás un resumen
      de tu resultado:</p>
 
   <div style="background:#F5F3FF;border-left:4px solid #4F46E5;padding:16px 20px;
               border-radius:0 8px 8px 0;margin:24px 0;">
     <p style="margin:0 0 8px;font-size:14px;color:#6B7280;font-weight:600;
               text-transform:uppercase;letter-spacing:0.05em;">Código dominante</p>
-    <p style="margin:0;font-size:28px;font-weight:700;color:#4F46E5;">${dominantCode}</p>
+    <p style="margin:0;font-size:28px;font-weight:700;color:#4F46E5;">${safeDominantCode}</p>
   </div>
 
   <h3 style="color:#374151;">Interpretación</h3>
-  <p style="line-height:1.6;">${interpretation}</p>
+  <p style="line-height:1.6;">${safeInterpretation}</p>
 
   <p style="text-align:center;margin:32px 0;">
-    <a href="${resultsUrl}"
+    <a href="${safeResultsUrl}"
        style="background:#4F46E5;color:#fff;padding:14px 28px;text-decoration:none;
               border-radius:6px;font-size:16px;font-weight:bold;display:inline-block;">
       Ver diagnóstico completo
     </a>
   </p>
   <p>O copia y pega este enlace en tu navegador:</p>
-  <p style="word-break:break-all;font-size:13px;color:#555;">${resultsUrl}</p>
+  <p style="word-break:break-all;font-size:13px;color:#555;">${safeResultsUrl}</p>
 
   <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
   <p style="font-size:12px;color:#888;">
@@ -147,7 +169,7 @@ export function buildResultsEmail(
 </body>
 </html>`;
 
-  const text = `${greeting},
+  const text = `${studentName ? `Hola, ${studentName}` : "Hola"},
 
 Has completado el diagnóstico vocacional con el método ${methodName}.
 

@@ -78,9 +78,9 @@ function LoginForm() {
           {result.error}
           {result.unverified && (
             <p style={{ margin: "6px 0 0", fontSize: 13 }}>
-              ¿No recibiste el correo?{" "}
-              <Link href="/register" style={{ fontWeight: 600 }}>
-                Regístrate nuevamente
+              Tu cuenta aún no está verificada. ¿No recibiste el correo?{" "}
+              <Link href="/register?resend=1" style={{ fontWeight: 600 }}>
+                Solicitar nuevo enlace de verificación
               </Link>
               .
             </p>
