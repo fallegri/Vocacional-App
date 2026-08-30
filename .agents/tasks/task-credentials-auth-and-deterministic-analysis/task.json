@@ -1,7 +1,14 @@
 {
   "task_id": "task-credentials-auth-and-deterministic-analysis",
   "task_description": "Pivot OrientApp web: (A) make the vocational analysis fully deterministic via the 5 method engines and REMOVE the RAG/AI-advisor machinery (embeddings, retrieval, Tutor, AI report, ai_config, pgvector). (B) Replace Google OAuth with self-hosted email+password auth with email verification (Resend), bcrypt password hashing, Auth.js v5 Credentials + JWT sessions, DB-backed roles in Neon, a seeded initial admin, admin-assigned roles (default STUDENT). (C) Rename cohorts to free-text-named GROUPS keeping anonymous group-student entry (email-only) and QR->assigned-method routing, add Resend results emails, and update docs. Work on branch feat/web-migration-vercel-neon; do not push. Keep Spanish UI, no-env build invariant, and method-engine tests green.",
-  "status": "in_progress",
+  "status": "completed",
   "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
-  "blocked_reason": null
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "174 Vitest tests green (17 files, +9 new), tsc --noEmit clean, next lint 0 warnings/errors, no-env build succeeds with DATABASE_URL/AUTH_SECRET/RESEND_API_KEY/EMAIL_FROM all unset. Review fixup commit 9615ab5 on feat/web-migration-vercel-neon addresses all 5 review issues: (1) dead now variable removed from createUser, (2) SUPER_ADMIN self-demotion guard added in setUserRole, (3) consumeVerificationToken made atomic with single UPDATE...RETURNING, (4) NEXT_PUBLIC_APP_URL fallback logs Spanish warning + marked as REQUIRED in .env.example, (5) registerAction handles existing-unverified accounts by resending token."
+  }
 }
