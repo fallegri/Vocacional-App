@@ -159,33 +159,110 @@ La app queda disponible en http://localhost:3000.
 
 ---
 
-## Provisionar Neon
+## Checklist de despliegue paso a paso
 
-1. Crea un proyecto en [Neon](https://neon.tech) y una base de datos.
-2. Copia la **connection string** (`?sslmode=require`) a `DATABASE_URL`.
-3. Aplica el esquema y siembra el admin inicial:
+### Paso 1 — Neon (base de datos)
 
-```bash
-cd web
-DATABASE_URL="postgres://...neon.tech/...?sslmode=require" npm run db:seed
-```
-
-El script `web/db/schema.sql` es idempotente (`IF NOT EXISTS`). Ejecutarlo varias
-veces no duplica datos.
+1. Crea una cuenta gratuita en [neon.tech](https://neon.tech).
+2. Crea un proyecto y dentro de el una base de datos (nombre sugerido: `orientapp`).
+3. Copia la **connection string** que incluye `?sslmode=require`; ese valor es tu `DATABASE_URL`.
+4. **No es necesario habilitar pgvector** — el modulo RAG fue eliminado en esta version.
 
 ---
 
-## Despliegue en Vercel
+### Paso 2 — Resend (correos transaccionales)
 
-1. Importa el repositorio en [Vercel](https://vercel.com/new).
-2. **Root Directory:** `web`.
-3. Variables de entorno obligatorias en runtime:
-   - `DATABASE_URL`
-   - `AUTH_SECRET`
-   - `NEXT_PUBLIC_APP_URL`
-4. Variables opcionales para correos: `RESEND_API_KEY`, `EMAIL_FROM`.
-5. Variables opcionales para admin inicial: `INITIAL_ADMIN_EMAIL`,
-   `INITIAL_ADMIN_PASSWORD`.
+1. Crea una cuenta gratuita en [resend.com](https://resend.com).
+2. Ve a **API Keys → Create**, genera una clave y copiala; ese valor es tu `RESEND_API_KEY`.
+3. **Para pruebas sin dominio propio:** usa el remitente `onboarding@resend.dev` como `EMAIL_FROM`. Solo puede enviar correos a tu propia direccion verificada en Resend, pero es suficiente para validar el flujo completo.
+4. **Para produccion real:** ve a **Domains → Add Domain**, agrega los registros DNS que te indica Resend, y una vez verificado usa una direccion de ese dominio (p. ej. `OrientApp <noreply@tudominio.com>`) como `EMAIL_FROM`.
+5. **Nota:** si `RESEND_API_KEY` no esta configurada, la app sigue funcionando con normalidad; los correos se omiten silenciosamente sin generar errores.
+
+---
+
+### Paso 3 — AUTH\_SECRET
+
+Genera el secreto de sesion ejecutando:
+
+```bash
+openssl rand -base64 32
+```
+
+Guarda el resultado como `AUTH_SECRET`.
+
+---
+
+### Paso 4 — Vercel (despliegue)
+
+1. Importa el repositorio en [vercel.com/new](https://vercel.com/new).
+2. Configura **Root Directory:** `web` (importante, no dejar en blanco).
+3. **Framework:** Next.js (se detecta automaticamente).
+4. En **Project Settings → Environment Variables** agrega todas las variables con sus valores:
+
+   | Variable | Valor de ejemplo |
+   |---|---|
+   | `DATABASE_URL` | `postgres://usuario:clave@host.neon.tech/orientapp?sslmode=require` |
+   | `AUTH_SECRET` | valor generado con `openssl rand -base64 32` |
+   | `NEXT_PUBLIC_APP_URL` | el dominio que Vercel te asigna, p. ej. `https://orientapp.vercel.app` |
+   | `RESEND_API_KEY` | clave copiada desde Resend |
+   | `EMAIL_FROM` | `onboarding@resend.dev` (pruebas) o `OrientApp <noreply@tudominio.com>` (produccion) |
+
+5. Haz clic en **Deploy**.
+
+---
+
+### Paso 5 — Aplicar esquema y sembrar el admin (una sola vez, tras el primer deploy)
+
+Desde el directorio `web/` con `DATABASE_URL` configurada en `.env.local`:
+
+```bash
+npm run db:seed
+```
+
+O directamente con la variable en linea:
+
+```bash
+DATABASE_URL="postgres://...?sslmode=require" npm run db:seed
+```
+
+Este comando crea todas las tablas (idempotente: ejecutarlo varias veces no duplica datos) y registra el administrador inicial.
+
+> **Si `DATABASE_URL` no esta definida** al correr `db:seed`, el script termina con un mensaje de error en espanol sin modificar nada en la base de datos.
+> Consulta [web/.env.example](.env.example) para ver la lista completa de variables disponibles.
+
+---
+
+### Paso 6 — Primera entrada y cambio de contrasena obligatorio
+
+1. Ve a `https://tu-app.vercel.app/login`.
+2. Inicia sesion con las credenciales del admin inicial:
+   - **Email:** `admin@orientapp.local`
+   - **Contrasena:** `OrientApp!Admin2026`
+3. Ve inmediatamente a perfil / ajustes y **cambia la contrasena** por una segura.
+4. Desde el panel de administracion → **Usuarios**: asigna los roles correspondientes al personal de tu institucion.
+
+---
+
+### Paso 7 — Crear el primer grupo y probar el QR
+
+1. En el panel de administracion ve a **Grupos → Crear grupo**.
+2. Asigna un nombre libre (p. ej. "Colegio 1", "Evento A") y selecciona el metodo de test.
+3. Descarga o imprime el codigo QR generado.
+4. Escanea el QR; el estudiante debe ver el formulario del test correspondiente.
+
+---
+
+### Tabla de verificacion final
+
+Antes de poner la app en uso, confirma cada punto:
+
+- [ ] La app carga correctamente en el dominio de Vercel
+- [ ] El login con `admin@orientapp.local` funciona
+- [ ] Se puede crear un grupo y se genera el QR
+- [ ] El QR lleva al formulario del test correcto
+- [ ] Al completar un test, el estudiante recibe un correo con los resultados (si Resend esta configurado)
+- [ ] Un usuario nuevo puede registrarse y recibe el correo de verificacion
+- [ ] El admin puede ver los resultados en el panel de administracion
 
 ---
 
