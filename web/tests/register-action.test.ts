@@ -4,13 +4,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Tests de registerAction (web/lib/actions/auth.ts).
 //
 // Cubre los casos:
-//   1. Registro exitoso de un usuario nuevo.
+//   1. Registro exitoso de un usuario nuevo (cuenta verificada de inmediato).
 //   2. Correo existente ya VERIFICADO -> error con mensaje específico.
-//   3. Correo existente NO VERIFICADO -> reenvía token -> ok:true con resent.
+//   3. Correo existente NO VERIFICADO -> marca como verificado -> ok:true con resent.
 //   4. Validaciones básicas (correo inválido, nombre vacío, contraseña corta).
 //
-// Se mockean todas las dependencias lazy: lib/auth/users, lib/auth/passwords,
-// lib/auth/tokens y lib/email/client.
+// Se mockean todas las dependencias lazy: lib/auth/users y lib/auth/passwords.
+// lib/email/client fue eliminado; lib/auth/tokens ya no se usa en registerAction.
 // ===========================================================================
 
 // Mocks de NextAuth mínimos para que auth.ts importe sin arrastrar next/server.
@@ -41,33 +41,29 @@ vi.mock("@/lib/auth/passwords", () => ({
 vi.mock("@/lib/auth/users", () => ({
   createUser: vi.fn(),
   findUserByEmail: vi.fn(),
+  markEmailVerified: vi.fn(async () => {}),
 }));
 
 vi.mock("@/lib/auth/tokens", () => ({
   createVerificationToken: vi.fn(async () => "new-token-123"),
 }));
 
-vi.mock("@/lib/email/client", () => ({
-  sendVerificationEmail: vi.fn(async () => ({ sent: false, skipped: true })),
-}));
-
 import { registerAction } from "@/lib/actions/auth";
-import { createUser, findUserByEmail } from "@/lib/auth/users";
+import { createUser, findUserByEmail, markEmailVerified } from "@/lib/auth/users";
 import { hashPassword } from "@/lib/auth/passwords";
 import { createVerificationToken } from "@/lib/auth/tokens";
-import { sendVerificationEmail } from "@/lib/email/client";
 
 const mockCreateUser = vi.mocked(createUser);
 const mockFindUserByEmail = vi.mocked(findUserByEmail);
 const mockHashPassword = vi.mocked(hashPassword);
 const mockCreateVerificationToken = vi.mocked(createVerificationToken);
-const mockSendVerificationEmail = vi.mocked(sendVerificationEmail);
+const mockMarkEmailVerified = vi.mocked(markEmailVerified);
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockHashPassword.mockResolvedValue("hashed-password");
   mockCreateVerificationToken.mockResolvedValue("new-token-abc");
-  mockSendVerificationEmail.mockResolvedValue({ sent: false, skipped: true });
+  mockMarkEmailVerified.mockResolvedValue(undefined);
 });
 
 describe("registerAction - validaciones de entrada", () => {
@@ -103,7 +99,7 @@ describe("registerAction - validaciones de entrada", () => {
 });
 
 describe("registerAction - usuario nuevo", () => {
-  it("registra exitosamente a un usuario nuevo", async () => {
+  it("registra exitosamente a un usuario nuevo y lo marca como verificado de inmediato", async () => {
     mockCreateUser.mockResolvedValue({
       id: "email:nuevo@example.com",
       email: "nuevo@example.com",
@@ -123,8 +119,11 @@ describe("registerAction - usuario nuevo", () => {
     expect(result.ok).toBe(true);
     expect(result.resent).toBeUndefined();
     expect(mockCreateUser).toHaveBeenCalledOnce();
-    expect(mockCreateVerificationToken).toHaveBeenCalledOnce();
-    expect(mockSendVerificationEmail).toHaveBeenCalledOnce();
+    // No se generan tokens ni se envían correos.
+    expect(mockCreateVerificationToken).not.toHaveBeenCalled();
+    // La cuenta se marca como verificada de inmediato.
+    expect(mockMarkEmailVerified).toHaveBeenCalledOnce();
+    expect(mockMarkEmailVerified).toHaveBeenCalledWith("nuevo@example.com");
   });
 });
 
@@ -153,12 +152,11 @@ describe("registerAction - correo existente", () => {
     expect(result.resent).toBeUndefined();
     expect(result.error).toContain("verificada");
     expect(result.error).toContain("Inicia sesión");
-    // No debe generar ni enviar un token para una cuenta ya verificada.
+    // No debe generar tokens ni enviar correos.
     expect(mockCreateVerificationToken).not.toHaveBeenCalled();
-    expect(mockSendVerificationEmail).not.toHaveBeenCalled();
   });
 
-  it("reenvía el token cuando la cuenta existe pero NO está verificada", async () => {
+  it("marca como verificada la cuenta no verificada y devuelve ok:true con resent:true", async () => {
     // createUser devuelve null -> ON CONFLICT
     mockCreateUser.mockResolvedValue(null);
     // El usuario existente NO está verificado.
@@ -181,34 +179,10 @@ describe("registerAction - correo existente", () => {
     expect(result.ok).toBe(true);
     expect(result.resent).toBe(true);
     expect(result.error).toContain("sin verificar");
-    expect(result.error).toContain("nuevo correo de confirmación");
-    // Debe generar un nuevo token y enviar el correo.
-    expect(mockCreateVerificationToken).toHaveBeenCalledOnce();
-    expect(mockSendVerificationEmail).toHaveBeenCalledOnce();
-  });
-
-  it("devuelve ok:true con resent:true incluso si el envío de correo falla", async () => {
-    mockCreateUser.mockResolvedValue(null);
-    mockFindUserByEmail.mockResolvedValue({
-      id: "email:fallo@example.com",
-      email: "fallo@example.com",
-      displayName: "Fallo Correo",
-      role: "STUDENT",
-      passwordHash: "old-hash",
-      emailVerifiedAt: null,
-      authProvider: "EMAIL",
-    });
-    // El envío del correo lanza una excepción.
-    mockSendVerificationEmail.mockRejectedValue(new Error("Error de red"));
-
-    const result = await registerAction({
-      email: "fallo@example.com",
-      displayName: "Intento Nuevo",
-      password: "contraseña123",
-    });
-
-    // El resultado sigue siendo ok:true con resent:true aunque el correo falle.
-    expect(result.ok).toBe(true);
-    expect(result.resent).toBe(true);
+    expect(result.error).toContain("Inicia sesión directamente");
+    // No debe generar tokens ni enviar correos; solo marca como verificada.
+    expect(mockCreateVerificationToken).not.toHaveBeenCalled();
+    expect(mockMarkEmailVerified).toHaveBeenCalledOnce();
+    expect(mockMarkEmailVerified).toHaveBeenCalledWith("sinverificar@example.com");
   });
 });

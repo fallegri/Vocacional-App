@@ -26,8 +26,8 @@ export interface RegisterResult {
  * Registra un nuevo usuario con correo y contraseña.
  * - Valida el formato del correo y la longitud mínima de la contraseña.
  * - Hashea la contraseña con bcrypt.
- * - Inserta el usuario en app_users con rol STUDENT y sin verificar.
- * - Genera un token de verificación y envía el correo de confirmación.
+ * - Inserta el usuario en app_users con rol STUDENT y lo marca como verificado
+ *   de inmediato (sin paso de verificación por correo).
  *
  * Devuelve { ok: true } si el registro fue exitoso, o { ok: false, error } si
  * ya existe el correo o hubo un fallo de validación.
@@ -57,9 +57,7 @@ export async function registerAction(params: {
 
   // Importaciones lazy para cumplir la invariante de build.
   const { hashPassword } = await import("@/lib/auth/passwords");
-  const { createUser, findUserByEmail } = await import("@/lib/auth/users");
-  const { createVerificationToken } = await import("@/lib/auth/tokens");
-  const { sendVerificationEmail } = await import("@/lib/email/client");
+  const { createUser, findUserByEmail, markEmailVerified } = await import("@/lib/auth/users");
 
   const passwordHash = await hashPassword(password);
 
@@ -67,23 +65,17 @@ export async function registerAction(params: {
 
   if (!newUser) {
     // ON CONFLICT DO NOTHING devolvió 0 filas: el correo ya está registrado.
-    // Verificar si la cuenta existente está sin verificar para reenviar el
-    // correo de confirmación en lugar de bloquear al usuario.
+    // Verificar si la cuenta existente está sin verificar.
     const existing = await findUserByEmail(email);
     if (existing && existing.emailVerifiedAt === null) {
-      // La cuenta existe pero no está verificada. Generar y enviar un nuevo
-      // token para desbloquear el flujo de verificación.
-      try {
-        const token = await createVerificationToken(email);
-        await sendVerificationEmail(email, token, existing.displayName);
-      } catch {
-        console.error("[registerAction] Error al reenviar correo de verificación.");
-      }
+      // La cuenta existe pero no está verificada. Marcarla como verificada
+      // para que el usuario pueda iniciar sesión directamente.
+      await markEmailVerified(email);
       return {
         ok: true,
         resent: true,
         error:
-          "Ya existe una cuenta sin verificar con ese correo. Te hemos enviado un nuevo correo de confirmación.",
+          "Ya existe una cuenta sin verificar con ese correo. Inicia sesión directamente.",
       };
     }
     return {
@@ -93,14 +85,8 @@ export async function registerAction(params: {
     };
   }
 
-  // Generar token de verificación y enviar correo de confirmación.
-  try {
-    const token = await createVerificationToken(email);
-    await sendVerificationEmail(email, token, displayName);
-  } catch {
-    // El registro se completó; el fallo del correo no debe bloquearlo.
-    console.error("[registerAction] Error al enviar correo de verificación.");
-  }
+  // Marcar la cuenta como verificada de inmediato (sin paso de correo).
+  await markEmailVerified(email);
 
   return { ok: true };
 }

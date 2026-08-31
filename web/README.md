@@ -8,8 +8,8 @@ Compose) a **Next.js 15 (App Router) + TypeScript**, desplegable en **Vercel** c
 > **Rediseno de arquitectura:** En la version actual se eliminaron el Tutor IA,
 > el Asesor IA, la base de conocimiento (RAG / pgvector) y la autenticacion con
 > Google OAuth. El analisis vocacional es completamente determinista (motores
-> puros sin LLM) y la autenticacion es email + contrasena con verificacion via
-> Resend.
+> puros sin LLM) y la autenticacion es email + contrasena. El registro crea la
+> cuenta verificada de inmediato (sin paso de verificacion por correo).
 
 ---
 
@@ -35,9 +35,9 @@ Todos los resultados se calculan mediante algoritmos deterministas definidos en
 ### Flujo de registro / inicio de sesion
 
 1. El usuario se **registra** en `/register` (nombre, correo, contrasena).
-2. Recibe un **correo de verificacion** (via Resend) con un enlace a `/verify?token=...`.
-3. Tras verificar, puede **iniciar sesion** en `/login`.
-4. El **administrador principal (SUPER_ADMIN)** asigna roles a los usuarios
+2. La cuenta queda **verificada de inmediato**: puede **iniciar sesion** en `/login`
+   sin ningun paso adicional de verificacion.
+3. El **administrador principal (SUPER_ADMIN)** asigna roles a los usuarios
    desde el panel de administracion (pestana "Usuarios").
 
 ### Modelo de roles
@@ -97,22 +97,6 @@ mayusculas + sufijo aleatorio de 4 chars para evitar colisiones).
 
 ---
 
-## Correos transaccionales (Resend)
-
-La app envia dos tipos de correos:
-
-| Evento | Destinatario | Contenido |
-|---|---|---|
-| Registro | Usuario nuevo | Enlace de verificacion de cuenta (expira en 24 h) |
-| Fin del test | Estudiante | Codigo dominante, interpretacion y enlace a resultados |
-
-**Degradacion elegante:** Si `RESEND_API_KEY` o `EMAIL_FROM` no estan definidas,
-el envio queda silenciado (solo un log en consola). La app sigue funcionando con
-normalidad. El correo de resultados es **best-effort**: si falla, la respuesta
-HTTP `201` de la sesion no se ve afectada.
-
----
-
 ## Variables de entorno
 
 Copia `web/.env.example` a `web/.env.local` y completa los valores.
@@ -122,9 +106,7 @@ Copia `web/.env.example` a `web/.env.local` y completa los valores.
 |---|:---:|---|
 | `DATABASE_URL` | Runtime | Conexion Neon Postgres. El build pasa sin ella. |
 | `AUTH_SECRET` | Runtime | Secreto JWT para Auth.js (genera con `openssl rand -base64 32`). Sin el, la app corre en "modo demo". |
-| `NEXT_PUBLIC_APP_URL` | No | URL publica de la app para construir enlaces de QR, verificacion y resultados. Si no se define se usa el origin de la peticion. |
-| `RESEND_API_KEY` | No | Clave de la API de Resend para envio de correos. Sin ella, los correos se omiten (skipped) sin errores. |
-| `EMAIL_FROM` | No | Direccion remitente, p. ej. `OrientApp <noreply@tudominio.com>`. Debe coincidir con un dominio verificado en Resend. |
+| `NEXT_PUBLIC_APP_URL` | No | URL publica de la app para construir enlaces de QR y resultados. Si no se define se usa el origin de la peticion. |
 | `INITIAL_ADMIN_EMAIL` | No | Correo del admin inicial sembrado (por defecto `admin@orientapp.local`). |
 | `INITIAL_ADMIN_PASSWORD` | No | Contrasena del admin inicial (por defecto `OrientApp!Admin2026`). Siempre se hashea con bcrypt. |
 | `STAFF_ACCESS_TOKEN` | No | Fallback heredado para modo demo sin credenciales. Queda inactivo cuando `AUTH_SECRET` esta definido. |
@@ -170,17 +152,7 @@ La app queda disponible en http://localhost:3000.
 
 ---
 
-### Paso 2 — Resend (correos transaccionales)
-
-1. Crea una cuenta gratuita en [resend.com](https://resend.com).
-2. Ve a **API Keys → Create**, genera una clave y copiala; ese valor es tu `RESEND_API_KEY`.
-3. **Para pruebas sin dominio propio:** usa el remitente `onboarding@resend.dev` como `EMAIL_FROM`. Solo puede enviar correos a tu propia direccion verificada en Resend, pero es suficiente para validar el flujo completo.
-4. **Para produccion real:** ve a **Domains → Add Domain**, agrega los registros DNS que te indica Resend, y una vez verificado usa una direccion de ese dominio (p. ej. `OrientApp <noreply@tudominio.com>`) como `EMAIL_FROM`.
-5. **Nota:** si `RESEND_API_KEY` no esta configurada, la app sigue funcionando con normalidad; los correos se omiten silenciosamente sin generar errores.
-
----
-
-### Paso 3 — AUTH\_SECRET
+### Paso 2 — AUTH\_SECRET
 
 Genera el secreto de sesion ejecutando:
 
@@ -204,8 +176,6 @@ Guarda el resultado como `AUTH_SECRET`.
    | `DATABASE_URL` | `postgres://usuario:clave@host.neon.tech/orientapp?sslmode=require` |
    | `AUTH_SECRET` | valor generado con `openssl rand -base64 32` |
    | `NEXT_PUBLIC_APP_URL` | el dominio que Vercel te asigna, p. ej. `https://orientapp.vercel.app` |
-   | `RESEND_API_KEY` | clave copiada desde Resend |
-   | `EMAIL_FROM` | `onboarding@resend.dev` (pruebas) o `OrientApp <noreply@tudominio.com>` (produccion) |
 
 5. Haz clic en **Deploy**.
 
@@ -260,8 +230,7 @@ Antes de poner la app en uso, confirma cada punto:
 - [ ] El login con `admin@orientapp.local` funciona
 - [ ] Se puede crear un grupo y se genera el QR
 - [ ] El QR lleva al formulario del test correcto
-- [ ] Al completar un test, el estudiante recibe un correo con los resultados (si Resend esta configurado)
-- [ ] Un usuario nuevo puede registrarse y recibe el correo de verificacion
+- [ ] Un usuario nuevo puede registrarse e iniciar sesion de inmediato
 - [ ] El admin puede ver los resultados en el panel de administracion
 
 ---
@@ -281,7 +250,6 @@ web/
   lib/
     auth/               # Helpers de sesion, roles, usuarios, tokens, passwords
     actions/            # Server actions (auth, cohorts, users)
-    email/              # Cliente Resend + constructores de mensajes
     methods/            # Motores deterministas (RIASEC, CHASIDE, TIPOV, CIPR, MAGDALENA)
     riasec/             # Motor RIASEC + tipos del dominio
     db.ts               # Cliente Neon lazy
@@ -301,5 +269,5 @@ cd web && npm run test -- --run
 ```
 
 165 tests en 16 archivos. Los motores deterministas tienen 100% de cobertura de
-los casos de interes/aptitud. Los tests de autenticacion, tokens, correos y
-acciones de usuario usan mocks de la base de datos y de Resend.
+los casos de interes/aptitud. Los tests de autenticacion, tokens y acciones de
+usuario usan mocks de la base de datos.

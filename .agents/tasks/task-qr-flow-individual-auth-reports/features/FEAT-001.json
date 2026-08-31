@@ -1,0 +1,36 @@
+{
+  "id": "FEAT-001",
+  "type": "chore",
+  "description": "Remove Resend email completely from the codebase. Remove from POST /api/sessions/route.ts (the best-effort email block), from registerAction in web/lib/actions/auth.ts (remove sendVerificationEmail import and call, make registration succeed without email verification - mark user as verified immediately or skip the email step), delete or empty web/lib/email/client.ts and web/lib/email/messages.ts, remove resend from package.json, update .env.example and web/README.md, update all affected tests.",
+  "status": "in_progress",
+  "steps": [
+    "1. In web/app/api/sessions/route.ts: remove the entire 'if (ownerEmail)' block that does 'const { sendResultsEmailTo } = await import(\"@/lib/email/client\")' and the surrounding try/catch. The route should return NextResponse.json({ id }, { status: 201 }) immediately after persistSession succeeds.",
+    "2. In web/lib/actions/auth.ts (registerAction): remove the lazy import of sendVerificationEmail from @/lib/email/client. Remove the call to createVerificationToken and sendVerificationEmail for new users (the try/catch block at the end of the new-user path). Remove the similar block in the 'resent' path for unverified existing users. IMPORTANT: registration must still work - since email verification is removed, mark users as verified immediately. In createUser call (web/lib/auth/users.ts already exists - check if it accepts an emailVerifiedAt param) OR simply call markEmailVerified(email) right after createUser succeeds. For the 'resent' path (unverified existing user), remove the token/email sending and just return the same message without sending email.",
+    "3. Check web/lib/auth/users.ts to understand createUser signature and whether emailVerifiedAt can be passed. If not, call markEmailVerified right after createUser.",
+    "4. Delete web/lib/email/client.ts and web/lib/email/messages.ts entirely.",
+    "5. In web/package.json: remove 'resend' from dependencies.",
+    "6. Run 'cd web && npm install' to update package-lock.json.",
+    "7. Update web/.env.example: remove the 'Envio de correos transaccionales (Resend)' section (RESEND_API_KEY and EMAIL_FROM lines and their comments). Keep all other sections.",
+    "8. Update web/README.md: remove references to Resend, email verification step, RESEND_API_KEY. Update the auth flow description: registration now creates a verified account immediately, no email verification step needed.",
+    "9. Update web/tests/register-action.test.ts: remove the mock of @/lib/email/client, remove mockSendVerificationEmail references, update test cases - 'registro exitoso' should no longer expect sendVerificationEmail to be called. 'resent' path for unverified user should not expect email sending. Update expectations to match the new flow.",
+    "10. Delete web/tests/email-client.test.ts (it tests the deleted email/client.ts).",
+    "11. Delete web/tests/email-messages.test.ts (it tests the deleted email/messages.ts).",
+    "12. Verify: cd web && npx tsc --noEmit && npm run test -- --run"
+  ],
+  "acceptance_criteria": [
+    "web/lib/email/client.ts and web/lib/email/messages.ts are deleted",
+    "web/app/api/sessions/route.ts has no import or reference to @/lib/email/client",
+    "web/lib/actions/auth.ts has no import or reference to sendVerificationEmail or @/lib/email/client",
+    "'resend' is removed from web/package.json dependencies",
+    "web/tests/email-client.test.ts and web/tests/email-messages.test.ts are deleted",
+    "web/tests/register-action.test.ts is updated and all its tests pass",
+    "All remaining tests pass: npm run test -- --run",
+    "tsc --noEmit passes with no errors"
+  ],
+  "verification": [
+    "cd web && npx tsc --noEmit",
+    "cd web && npm run test -- --run"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
