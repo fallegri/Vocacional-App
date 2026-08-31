@@ -4,6 +4,8 @@ import AssessmentClient, {
 import { listMethods, normalizeMethodId } from "@/lib/methods/registry";
 import type { MethodId } from "@/lib/methods/types";
 import { listCohorts } from "@/lib/actions/cohorts";
+import { getCurrentUser } from "@/lib/auth/session";
+import { redirect } from "next/navigation";
 
 export const metadata = {
   title: "Evaluación Vocacional | OrientApp",
@@ -22,6 +24,21 @@ export default async function AssessmentPage({
   const rawCohort = params.cohort;
   const cohortParam = Array.isArray(rawCohort) ? rawCohort[0] : rawCohort;
   const cohortCode = cohortParam ? cohortParam.trim().toUpperCase() : null;
+
+  // Si NO hay cohortCode (usuario individual), se requiere sesión iniciada.
+  // Los estudiantes de grupo acceden con cohortCode y pueden tomar el test de
+  // forma anónima, sin necesidad de cuenta.
+  if (!cohortCode) {
+    const user = await getCurrentUser();
+    if (!user) {
+      const rawMethod = params.method;
+      const methodParam = Array.isArray(rawMethod) ? rawMethod[0] : rawMethod;
+      const nextPath = methodParam
+        ? `/assessment?method=${encodeURIComponent(methodParam)}`
+        : "/assessment";
+      redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+    }
+  }
 
   const rawMethod = params.method;
   const methodParam = Array.isArray(rawMethod) ? rawMethod[0] : rawMethod;

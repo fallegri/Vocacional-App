@@ -66,6 +66,13 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
     (process.env.EMAIL_FROM ?? "").trim() ||
     "OrientApp <noreply@orientapp.local>";
 
+  // Advertir sobre la limitación del remitente de prueba de Resend.
+  if (from.includes("onboarding@resend.dev")) {
+    console.warn(
+      "[email] AVISO: onboarding@resend.dev solo puede enviar al correo verificado en tu cuenta Resend. Para enviar a cualquier correo, verifica un dominio en resend.com/domains."
+    );
+  }
+
   try {
     const resend = new Resend(apiKey);
     const result = await resend.emails.send({
@@ -79,6 +86,11 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
     if (result.error) {
       const msg = result.error.message ?? JSON.stringify(result.error);
       console.error(`[email] Error al enviar a ${payload.to}: ${msg}`);
+      if (from.includes("onboarding@resend.dev")) {
+        console.error(
+          "[email] AVISO: onboarding@resend.dev solo puede enviar al correo verificado en tu cuenta Resend. Para enviar a cualquier correo, verifica un dominio en resend.com/domains."
+        );
+      }
       return { sent: false, error: msg };
     }
 
