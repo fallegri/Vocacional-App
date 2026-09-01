@@ -1,0 +1,32 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Add Reportes tab to AdminClient with general report and group report with CSV export. Pure client-side aggregation from the already-passed initialSessions data. No new API calls needed.",
+  "status": "in_progress",
+  "steps": [
+    "1. In web/components/AdminClient.tsx: add 'reportes' to TabKey type: type TabKey = 'evaluaciones' | 'grupos' | 'usuarios' | 'reportes'.",
+    "2. Add a 'Reportes' tab button in the tabs row (after 'Usuarios').",
+    "3. Add state for the reports tab: selectedReportCohort (string for group report cohort filter), dateFrom/dateTo (optional string date filters for general report).",
+    "4. Implement GENERAL REPORT section: using useMemo on sessions array, compute: totalSessions, breakdownByMethod (count per methodId), breakdownByReviewStatus (count per reviewStatus), optionally breakdown by isValid. Display as stat cards or a simple table. Add optional date range filter (dateFrom, dateTo inputs that filter sessions by completedAt).",
+    "5. Implement GROUP REPORT section: a select dropdown to pick a cohort from the cohorts list. When a cohort is selected, filter sessions by cohortCode. Show: list of students (name, email, dominant code, method, date). Summary stats below the list: most common dominant code (mode), method used (or methods used), total count. Use useMemo for the filtered+aggregated data.",
+    "6. Implement 'Exportar CSV' button for the group report: a client-side function that takes the filtered sessions array and generates a CSV string (columns: Nombre, Correo, Código Dominante, Método, Fecha). Use a Blob + URL.createObjectURL + anchor click pattern to trigger the download. The filename should be 'reporte-{cohortCode}-{date}.csv'. All column headers in Spanish.",
+    "7. The tab content renders only when tab === 'reportes'.",
+    "8. Verify: tsc --noEmit, build passes. No new tests needed for pure UI components (the existing test suite covers the logic layers)."
+  ],
+  "acceptance_criteria": [
+    "AdminClient has a 'Reportes' tab that is visible and clickable",
+    "General report shows total sessions, breakdown by method (count per methodId), breakdown by review status",
+    "Group report has a cohort selector and shows the filtered sessions with dominant code, method, student name",
+    "Group report shows summary stats: most common dominant code, method breakdown",
+    "Exportar CSV button generates and downloads a CSV file with Spanish headers for the selected group",
+    "All existing tests pass: npm run test -- --run",
+    "tsc --noEmit and npm run build pass"
+  ],
+  "verification": [
+    "cd web && npx tsc --noEmit",
+    "cd web && npm run test -- --run",
+    "cd web && npm run build"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

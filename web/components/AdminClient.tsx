@@ -17,7 +17,7 @@ import type { SessionSummary } from "@/lib/sessions";
 import type { MethodId } from "@/lib/methods/types";
 import type { AppUserSummary } from "@/lib/actions/users";
 
-type TabKey = "evaluaciones" | "grupos" | "usuarios";
+type TabKey = "evaluaciones" | "grupos" | "usuarios" | "reportes";
 
 /** Métodos disponibles para asignar a un grupo (nombre visible en español). */
 const METHOD_OPTIONS: Array<{ id: MethodId; name: string }> = [
@@ -140,6 +140,9 @@ export default function AdminClient({
   const [userErrors, setUserErrors] = useState<Record<string, string | null>>({});
   const [userNotices, setUserNotices] = useState<Record<string, string | null>>({});
 
+  // ----- Estado de reportes -----
+  const [selectedReportCohort, setSelectedReportCohort] = useState<string>("ALL");
+
   // Base absoluta para los enlaces del QR (segura en SSR y en cliente).
   const origin = useMemo(() => {
     if (typeof window !== "undefined") return window.location.origin;
@@ -175,6 +178,57 @@ export default function AdminClient({
   const pendingCount = filteredSessions.filter(
     (s) => s.reviewStatus === "PENDING" || !s.reviewerNotes
   ).length;
+
+  // ----- Cómputos para pestaña Reportes -----
+  const generalReportStats = useMemo(() => {
+    const byMethod: Record<string, number> = {};
+    const byStatus: Record<string, number> = {};
+    const byCode: Record<string, number> = {};
+
+    for (const s of sessions) {
+      // Por método
+      const mid = s.methodId ?? "DESCONOCIDO";
+      byMethod[mid] = (byMethod[mid] ?? 0) + 1;
+
+      // Por estado de revisión
+      const st = s.reviewStatus ?? "PENDING";
+      byStatus[st] = (byStatus[st] ?? 0) + 1;
+
+      // Por código dominante
+      if (s.dominantCode) {
+        byCode[s.dominantCode] = (byCode[s.dominantCode] ?? 0) + 1;
+      }
+    }
+
+    const top5Codes = Object.entries(byCode)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    return { total: sessions.length, byMethod, byStatus, top5Codes };
+  }, [sessions]);
+
+  const groupReportData = useMemo(() => {
+    const filtered =
+      selectedReportCohort === "ALL"
+        ? sessions
+        : sessions.filter(
+            (s) =>
+              (s.cohortCode ?? "").toUpperCase() ===
+              selectedReportCohort.toUpperCase()
+          );
+
+    // Código dominante más frecuente en el grupo
+    const codeFreq: Record<string, number> = {};
+    for (const s of filtered) {
+      if (s.dominantCode) {
+        codeFreq[s.dominantCode] = (codeFreq[s.dominantCode] ?? 0) + 1;
+      }
+    }
+    const topCode =
+      Object.entries(codeFreq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
+
+    return { filtered, topCode, total: filtered.length };
+  }, [sessions, selectedReportCohort]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -305,7 +359,42 @@ export default function AdminClient({
   const getRoleDraft = (user: AppUserSummary): UserRoleCode =>
     roleDrafts[user.id] ?? user.role;
 
-  const handleRoleChange = (userId: string, role: UserRoleCode) => {
+  const exportGroupCsv = () => {
+    const rows = groupReportData.filtered;
+    const cohortLabel =
+      selectedReportCohort === "ALL" ? "todos" : selectedReportCohort;
+    const dateStr = new Date().toISOString().slice(0, 10);
+
+    const headers = ["Nombre", "Correo", "Método", "Código Dominante", "Fecha", "Estado"];
+    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const lines = [
+      headers.map(escape).join(","),
+      ...rows.map((s) =>
+        [
+          s.studentName ?? "",
+          s.studentEmail ?? "",
+          METHOD_OPTIONS.find((m) => m.id === s.methodId)?.name ?? s.methodId ?? "",
+          s.dominantCode ?? "",
+          s.completedAt ? new Date(s.completedAt).toLocaleDateString("es-ES") : "",
+          s.reviewStatus
+            ? (REVIEW_STATUS[s.reviewStatus as ReviewStatusCode]?.displayName ?? s.reviewStatus)
+            : REVIEW_STATUS.PENDING.displayName,
+        ]
+          .map(escape)
+          .join(",")
+      ),
+    ];
+
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `reporte-${cohortLabel}-${dateStr}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };  const handleRoleChange = (userId: string, role: UserRoleCode) => {
     setRoleDrafts((prev) => ({ ...prev, [userId]: role }));
   };
 
@@ -410,6 +499,13 @@ export default function AdminClient({
           onClick={() => setTab("usuarios")}
         >
           Usuarios
+        </button>
+        <button
+          type="button"
+          className={tab === "reportes" ? "btn" : "btn btn-secondary"}
+          onClick={() => setTab("reportes")}
+        >
+          Reportes
         </button>
       </div>
 
@@ -911,6 +1007,199 @@ export default function AdminClient({
               })}
             </div>
           )}
+        </div>
+      ) : null}
+
+      {tab === "reportes" ? (
+        <div className="stack" style={{ gap: 20 }}>
+          {/* Reporte General */}
+          <div className="card">
+            <h2 style={{ marginTop: 0 }}>Reporte General</h2>
+            <p className="muted" style={{ marginTop: 0 }}>
+              Resumen de todas las evaluaciones registradas en el sistema.
+            </p>
+
+            {/* Totales */}
+            <div className="card card-muted center" style={{ marginBottom: 16 }}>
+              <div className="muted" style={{ fontSize: 12 }}>Total de evaluaciones</div>
+              <div style={{ fontSize: 28, fontWeight: 700 }}>{generalReportStats.total}</div>
+            </div>
+
+            <div className="grid grid-2" style={{ gap: 16 }}>
+              {/* Por método */}
+              <div>
+                <h3 style={{ marginTop: 0, marginBottom: 8 }}>Por Método</h3>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", padding: "4px 8px", borderBottom: "1px solid var(--border)" }}>Método</th>
+                      <th style={{ textAlign: "right", padding: "4px 8px", borderBottom: "1px solid var(--border)" }}>Cantidad</th>
+                      <th style={{ textAlign: "right", padding: "4px 8px", borderBottom: "1px solid var(--border)" }}>%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(generalReportStats.byMethod).map(([mid, count]) => {
+                      const pct =
+                        generalReportStats.total > 0
+                          ? ((count / generalReportStats.total) * 100).toFixed(1)
+                          : "0.0";
+                      const methodName =
+                        METHOD_OPTIONS.find((m) => m.id === mid)?.name ?? mid;
+                      return (
+                        <tr key={mid}>
+                          <td style={{ padding: "4px 8px" }}>{methodName}</td>
+                          <td style={{ padding: "4px 8px", textAlign: "right" }}>{count}</td>
+                          <td style={{ padding: "4px 8px", textAlign: "right" }}>{pct}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Por estado de revisión */}
+              <div>
+                <h3 style={{ marginTop: 0, marginBottom: 8 }}>Por Estado</h3>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: "left", padding: "4px 8px", borderBottom: "1px solid var(--border)" }}>Estado</th>
+                      <th style={{ textAlign: "right", padding: "4px 8px", borderBottom: "1px solid var(--border)" }}>Cantidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(generalReportStats.byStatus).map(([st, count]) => {
+                      const label =
+                        REVIEW_STATUS[st as ReviewStatusCode]?.displayName ?? st;
+                      return (
+                        <tr key={st}>
+                          <td style={{ padding: "4px 8px" }}>{label}</td>
+                          <td style={{ padding: "4px 8px", textAlign: "right" }}>{count}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Top 5 códigos dominantes */}
+            <div style={{ marginTop: 16 }}>
+              <h3 style={{ marginTop: 0, marginBottom: 8 }}>Top 5 Códigos Dominantes</h3>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left", padding: "4px 8px", borderBottom: "1px solid var(--border)" }}>Código</th>
+                    <th style={{ textAlign: "right", padding: "4px 8px", borderBottom: "1px solid var(--border)" }}>Cantidad</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {generalReportStats.top5Codes.map(([code, count]) => (
+                    <tr key={code}>
+                      <td style={{ padding: "4px 8px" }}>
+                        <span className="badge">{code}</span>
+                      </td>
+                      <td style={{ padding: "4px 8px", textAlign: "right" }}>{count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Reporte por Grupo */}
+          <div className="card">
+            <h2 style={{ marginTop: 0 }}>Reporte por Grupo</h2>
+
+            <div style={{ marginBottom: 14 }}>
+              <label className="label" htmlFor="report-cohort-select">
+                Seleccionar grupo
+              </label>
+              <select
+                id="report-cohort-select"
+                className="select"
+                value={selectedReportCohort}
+                onChange={(e) => setSelectedReportCohort(e.target.value)}
+              >
+                <option value="ALL">Todos los grupos</option>
+                {cohorts.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.title ? `${c.title} (${c.code})` : c.code}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {groupReportData.total === 0 ? (
+              <div className="card card-muted center">
+                <p className="muted" style={{ margin: 0 }}>
+                  No hay evaluaciones para el grupo seleccionado.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid var(--border)" }}>Nombre</th>
+                        <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid var(--border)" }}>Correo</th>
+                        <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid var(--border)" }}>Método</th>
+                        <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid var(--border)" }}>Código Dominante</th>
+                        <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid var(--border)" }}>Fecha</th>
+                        <th style={{ textAlign: "left", padding: "6px 8px", borderBottom: "1px solid var(--border)" }}>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupReportData.filtered.map((s) => {
+                        const methodName =
+                          METHOD_OPTIONS.find((m) => m.id === s.methodId)?.name ?? s.methodId ?? "—";
+                        const statusLabel = s.reviewStatus
+                          ? (REVIEW_STATUS[s.reviewStatus as ReviewStatusCode]?.displayName ?? s.reviewStatus)
+                          : REVIEW_STATUS.PENDING.displayName;
+                        return (
+                          <tr key={s.id}>
+                            <td style={{ padding: "6px 8px" }}>{s.studentName ?? "—"}</td>
+                            <td style={{ padding: "6px 8px", fontSize: 12 }}>{s.studentEmail ?? "—"}</td>
+                            <td style={{ padding: "6px 8px" }}>{methodName}</td>
+                            <td style={{ padding: "6px 8px" }}>
+                              <span className="badge">{s.dominantCode || "—"}</span>
+                            </td>
+                            <td style={{ padding: "6px 8px", fontSize: 12 }}>
+                              {formatDate(s.completedAt ?? s.startedAt)}
+                            </td>
+                            <td style={{ padding: "6px 8px", fontSize: 12 }}>{statusLabel}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Resumen del grupo */}
+                <div className="card card-muted" style={{ marginTop: 14 }}>
+                  <div className="row" style={{ gap: 20, flexWrap: "wrap" }}>
+                    <div>
+                      <div className="muted" style={{ fontSize: 12 }}>Total evaluaciones</div>
+                      <div style={{ fontSize: 20, fontWeight: 700 }}>{groupReportData.total}</div>
+                    </div>
+                    <div>
+                      <div className="muted" style={{ fontSize: 12 }}>Código dominante más frecuente</div>
+                      <div style={{ fontSize: 20, fontWeight: 700 }}>
+                        <span className="badge">{groupReportData.topCode}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 12 }}>
+                  <button type="button" className="btn" onClick={exportGroupCsv}>
+                    Exportar CSV
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       ) : null}
 
