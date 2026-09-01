@@ -648,6 +648,89 @@ function UsuarioTab({ sessions }: { sessions: SessionSummary[] }) {
 // Por Área tab
 // ===========================================================================
 
+/** Methods where the dominant code is a sequence of per-dimension letters */
+const LETTER_METHODS = new Set(["RIASEC", "CHASIDE"]);
+
+/** Build a letter-frequency map for methods that use per-dimension letter codes */
+function buildLetterFreq(
+  sessions: SessionSummary[],
+): Record<string, number> {
+  const freq: Record<string, number> = {};
+  for (const s of sessions) {
+    const code = s.dominantCode ?? "";
+    for (const ch of code.split("")) {
+      if (ch.trim()) freq[ch] = (freq[ch] ?? 0) + 1;
+    }
+  }
+  return freq;
+}
+
+/** Build a whole-code frequency map for methods where codes are not letter-per-dimension */
+function buildCodeFreq(
+  sessions: SessionSummary[],
+): Record<string, number> {
+  const freq: Record<string, number> = {};
+  for (const s of sessions) {
+    const code = s.dominantCode ?? "";
+    if (code.trim()) freq[code] = (freq[code] ?? 0) + 1;
+  }
+  return freq;
+}
+
+/** Return the display label for a letter belonging to a specific method */
+function areaLabelForMethod(letter: string, method: string): string {
+  if (method === "RIASEC") {
+    return `${letter} - ${RIASEC_LABELS[letter] ?? letter}`;
+  }
+  if (method === "CHASIDE") {
+    return `${letter} - ${CHASIDE_LABELS[letter] ?? letter}`;
+  }
+  return letter;
+}
+
+/** One section of bars for a given method inside the "All methods" view */
+function AreaMethodSection({
+  methodId,
+  sessions,
+}: {
+  methodId: string;
+  sessions: SessionSummary[];
+}) {
+  const isLetterMethod = LETTER_METHODS.has(methodId);
+  const freq = isLetterMethod
+    ? buildLetterFreq(sessions)
+    : buildCodeFreq(sessions);
+  const entries = Object.entries(freq).sort((a, b) => b[1] - a[1]);
+
+  if (entries.length === 0) return null;
+
+  const max = entries[0]?.[1] ?? 1;
+  const total = entries.reduce((s, [, c]) => s + c, 0);
+
+  return (
+    <div className="card card-muted" style={{ marginBottom: 12 }}>
+      <h4 style={{ marginTop: 0, marginBottom: 10 }}>
+        {METHOD_LABELS[methodId] ?? methodId}
+        <span className="muted" style={{ fontWeight: 400, fontSize: 12, marginLeft: 8 }}>
+          ({sessions.length} sesión{sessions.length !== 1 ? "es" : ""}, {total} ocurrencias)
+        </span>
+      </h4>
+      {entries.map(([key, count]) => (
+        <CssBar
+          key={key}
+          label={
+            isLetterMethod
+              ? areaLabelForMethod(key, methodId)
+              : key
+          }
+          value={count}
+          max={max}
+        />
+      ))}
+    </div>
+  );
+}
+
 function AreaTab({ sessions }: { sessions: SessionSummary[] }) {
   const [areaMethodFilter, setAreaMethodFilter] = useState<string>("ALL");
 
@@ -656,48 +739,81 @@ function AreaTab({ sessions }: { sessions: SessionSummary[] }) {
     return sessions.filter((s) => s.methodId === areaMethodFilter);
   }, [sessions, areaMethodFilter]);
 
-  const areaData = useMemo(() => {
-    const freq: Record<string, number> = {};
-    for (const s of filtered) {
-      const code = s.dominantCode ?? "";
-      for (const ch of code.split("")) {
-        if (ch.trim()) freq[ch] = (freq[ch] ?? 0) + 1;
-      }
-    }
+  // For single-method view: compute freq data
+  const singleMethodData = useMemo(() => {
+    if (areaMethodFilter === "ALL") return null;
+    const isLetterMethod = LETTER_METHODS.has(areaMethodFilter);
+    const freq = isLetterMethod
+      ? buildLetterFreq(filtered)
+      : buildCodeFreq(filtered);
     return Object.entries(freq).sort((a, b) => b[1] - a[1]);
-  }, [filtered]);
+  }, [areaMethodFilter, filtered]);
 
-  const maxArea = areaData[0]?.[1] ?? 1;
-  const total = areaData.reduce((s, [, c]) => s + c, 0);
+  // For ALL view: sessions grouped by method
+  const byMethod = useMemo(() => {
+    if (areaMethodFilter !== "ALL") return null;
+    return ALL_METHODS.map((mid) => ({
+      methodId: mid,
+      sessions: sessions.filter((s) => s.methodId === mid),
+    })).filter((g) => g.sessions.length > 0);
+  }, [areaMethodFilter, sessions]);
 
-  const getAreaLabel = (letter: string): string => {
-    if (
-      areaMethodFilter === "RIASEC" ||
-      (areaMethodFilter === "ALL" && RIASEC_LABELS[letter])
-    ) {
-      return `${letter} - ${RIASEC_LABELS[letter] ?? letter}`;
-    }
-    if (
-      areaMethodFilter === "CHASIDE" ||
-      (areaMethodFilter === "ALL" && CHASIDE_LABELS[letter])
-    ) {
-      return `${letter} - ${CHASIDE_LABELS[letter] ?? letter}`;
-    }
-    return letter;
-  };
-
+  // Export helper — collects data from current view
   const handleExport = () => {
-    exportCsv(
-      ["Área", "Nombre Completo", "Cantidad", "Porcentaje"],
-      areaData.map(([letter, count]) => {
-        const fullName =
-          RIASEC_LABELS[letter] ?? CHASIDE_LABELS[letter] ?? letter;
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const rows: string[][] = [];
+
+    if (areaMethodFilter === "ALL") {
+      for (const { methodId, sessions: ms } of byMethod ?? []) {
+        const isLetterMethod = LETTER_METHODS.has(methodId);
+        const freq = isLetterMethod
+          ? buildLetterFreq(ms)
+          : buildCodeFreq(ms);
+        const total = Object.values(freq).reduce((s, c) => s + c, 0);
+        for (const [key, count] of Object.entries(freq).sort(
+          (a, b) => b[1] - a[1],
+        )) {
+          const fullName = isLetterMethod
+            ? (methodId === "RIASEC"
+                ? (RIASEC_LABELS[key] ?? key)
+                : (CHASIDE_LABELS[key] ?? key))
+            : key;
+          const pct =
+            total > 0 ? ((count / total) * 100).toFixed(1) + "%" : "0%";
+          rows.push([
+            METHOD_LABELS[methodId] ?? methodId,
+            key,
+            fullName,
+            String(count),
+            pct,
+          ]);
+        }
+      }
+      exportCsv(
+        ["Método", "Área / Código", "Nombre Completo", "Cantidad", "Porcentaje"],
+        rows,
+        `reporte-area-todos-${dateStr}.csv`,
+      );
+    } else {
+      const isLetterMethod = LETTER_METHODS.has(areaMethodFilter);
+      const data = singleMethodData ?? [];
+      const total = data.reduce((s, [, c]) => s + c, 0);
+      for (const [key, count] of data) {
+        const fullName = isLetterMethod
+          ? (areaMethodFilter === "RIASEC"
+              ? (RIASEC_LABELS[key] ?? key)
+              : (CHASIDE_LABELS[key] ?? key))
+          : key;
         const pct =
           total > 0 ? ((count / total) * 100).toFixed(1) + "%" : "0%";
-        return [letter, fullName, String(count), pct];
-      }),
-      `reporte-area-${new Date().toISOString().slice(0, 10)}.csv`
-    );
+        rows.push([key, fullName, String(count), pct]);
+      }
+      exportCsv(
+        ["Área / Código", "Nombre Completo", "Cantidad", "Porcentaje"],
+        rows,
+        `reporte-area-${areaMethodFilter.toLowerCase()}-${dateStr}.csv`,
+      );
+    }
   };
 
   return (
@@ -726,19 +842,38 @@ function AreaTab({ sessions }: { sessions: SessionSummary[] }) {
           ))}
         </select>
       </div>
-      {areaData.length === 0 ? (
-        <p className="muted">Sin datos para el filtro seleccionado.</p>
+
+      {areaMethodFilter === "ALL" ? (
+        /* ALL view: one section per method so labels never collide */
+        byMethod && byMethod.length > 0 ? (
+          <div>
+            {byMethod.map(({ methodId, sessions: ms }) => (
+              <AreaMethodSection key={methodId} methodId={methodId} sessions={ms} />
+            ))}
+          </div>
+        ) : (
+          <p className="muted">Sin datos para el filtro seleccionado.</p>
+        )
       ) : (
-        <div>
-          {areaData.map(([letter, count]) => (
-            <CssBar
-              key={letter}
-              label={getAreaLabel(letter)}
-              value={count}
-              max={maxArea}
-            />
-          ))}
-        </div>
+        /* Single-method view */
+        singleMethodData && singleMethodData.length > 0 ? (
+          <div>
+            {singleMethodData.map(([key, count]) => (
+              <CssBar
+                key={key}
+                label={
+                  LETTER_METHODS.has(areaMethodFilter)
+                    ? areaLabelForMethod(key, areaMethodFilter)
+                    : key
+                }
+                value={count}
+                max={singleMethodData[0]?.[1] ?? 1}
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="muted">Sin datos para el filtro seleccionado.</p>
+        )
       )}
     </div>
   );
