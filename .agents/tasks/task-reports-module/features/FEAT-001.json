@@ -1,0 +1,73 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Extract the Reportes tab from AdminClient.tsx into a dedicated ReportsClient.tsx component, then implement the full reports module: Dashboard view, 6 filterable sub-report views (Por Usuario, Por Área, Por Grupo, Por Fecha, Por Carrera, Por Método), and export capabilities (CSV per sub-report + print/PDF for dashboard). All text in Spanish. No new external npm dependencies.",
+  "status": "completed",
+  "steps": [
+    "STEP 1 - Create web/components/ReportsClient.tsx as a 'use client' component. It accepts props: { sessions: SessionSummary[], cohorts: CohortGroup[] }. Import SessionSummary from @/lib/sessions. Import CohortGroup, REVIEW_STATUS, ReviewStatusCode from @/lib/riasec/types.",
+
+    "STEP 2 - In ReportsClient.tsx, define a sub-tab type: type ReportTab = 'dashboard' | 'usuario' | 'area' | 'grupo' | 'fecha' | 'carrera' | 'metodo'. Add useState for activeTab, defaulting to 'dashboard'.",
+
+    "STEP 3 - Add a sub-tab nav row with 7 buttons: Dashboard, Por Usuario, Por Área, Por Grupo, Por Fecha, Por Carrera, Por Método. Style active tab with 'btn' class and inactive with 'btn btn-secondary'. Each button sets activeTab.",
+
+    "STEP 4 - DASHBOARD VIEW (activeTab === 'dashboard'): Implement using useMemo on sessions. Show: (a) 4 summary cards in a grid grid-4 or grid-2+grid-2: Total Evaluaciones, Esta Semana (completedAt in last 7 days), Este Mes (completedAt in last 30 days), Fiabilidad Promedio (% sessions where isValid=true). (b) Dominant Code Distribution: CSS bar chart showing count per dominantCode (sort by count desc, top 12 max). Each bar is a div with height proportional to max count, label below, count above. Use inline style width for horizontal bars or height for vertical. (c) RIASEC Dimension Averages: for RIASEC sessions only, show average scores for R, I, A, S, E, C as horizontal CSS bars (0-100 range). Label each with full name: Realista, Investigador, Artístico, Social, Emprendedor, Convencional. (d) Group Comparison table: for each cohort that has sessions, show a row: Group name, session count, most common dominant code, most common topCareerTitle (RIASEC sessions in that group). (e) 'Imprimir / Guardar como PDF' button that calls window.print() — add a comment that print-friendly styling can be added via CSS @media print.",
+
+    "STEP 5 - POR USUARIO view (activeTab === 'usuario'): Add useState for userSearch (string). Render a search input (placeholder: 'Buscar por nombre, correo o grupo...'). Filter sessions client-side by name/email/cohortCode containing the search term (case-insensitive). Render a scrollable table with columns: Nombre, Correo, Grupo, Método, Código Dominante, Carrera Top (only for RIASEC, '—' otherwise), Fecha, Fiabilidad, Estado. Each row has a 'Ver diagnóstico' link to /results/[id]. Add 'Exportar CSV' button that exports ALL filtered rows (UTF-8 BOM, \\uFEFF prefix). CSV headers: Nombre,Correo,Grupo,Método,Código Dominante,Carrera Top,Fecha,Fiabilidad,Estado.",
+
+    "STEP 6 - POR ÁREA view (activeTab === 'area'): Add useState for areaMethodFilter (MethodId | 'ALL', default 'ALL'). Compute: for each method, parse dominantCode (e.g. 'RIA' means R, I, A are in the top set; treat each letter as an area). Count how many sessions have each letter anywhere in their dominantCode. Show a method filter dropdown. Show horizontal CSS bar chart: each area letter (or full letter set for non-RIASEC) as a row with a bar proportional to count. For RIASEC: areas R,I,A,S,E,C with full names. For CHASIDE: C,H,A,S,I,D,E. For TIPOV and CIPR show top 10 dominant codes by count. For MAGDALENA same. Label bars with letter + full name + count. Add 'Exportar CSV' button with columns: Área,Nombre Completo,Cantidad,Porcentaje.",
+
+    "STEP 7 - POR GRUPO view (activeTab === 'grupo'): Replaces the existing group report in AdminClient. Add cohort select dropdown (same pattern as existing: value=selectedGroup, onChange). Show per-group summary: session count, average reliability (% isValid), most common dominant code, most common career (RIASEC). For the selected group or ALL, show an expanded table: Nombre, Correo, Método, Código Dominante, Carrera Top, Fecha, Fiabilidad, Estado. For RIASEC groups, show a dimension averages row (avg R,I,A,S,E,C for that group) as a mini bar chart below the table. Add 'Exportar CSV' button (same columns as existing exportGroupCsv but also add Carrera Top and Fiabilidad). CSV filename: reporte-grupo-{cohort}-{date}.csv. CSV headers: Nombre,Correo,Método,Código Dominante,Carrera Top,Fecha,Fiabilidad,Estado.",
+
+    "STEP 8 - POR FECHA view (activeTab === 'fecha'): Add state: dateFrom (string, YYYY-MM-DD), dateTo (string, YYYY-MM-DD). Render two date inputs (type='date') for the range. Filter sessions by completedAt in [dateFrom, dateTo] range (if set). Show count of sessions per day in the filtered range as a horizontal bar timeline (CSS bars). List the filtered sessions in a table: Nombre, Grupo, Método, Código Dominante, Fecha. Add 'Exportar CSV' button for filtered results. CSV filename: reporte-fecha-{dateFrom}-{dateTo}.csv. CSV headers: Nombre,Correo,Grupo,Método,Código Dominante,Fecha,Estado.",
+
+    "STEP 9 - POR CARRERA view (activeTab === 'carrera'): Filter to RIASEC sessions only (s.methodId === 'RIASEC'). Group sessions by topCareerTitle. For each career, show: career title, count of students matched, percentage of total RIASEC sessions. Render as CSS horizontal bar chart sorted by count descending. Show a note that this view only applies to RIASEC sessions. Add 'Exportar CSV' with columns: Carrera,Cantidad,Porcentaje.",
+
+    "STEP 10 - POR MÉTODO view (activeTab === 'metodo'): For each method (RIASEC, CHASIDE, TIPOV, CIPR, MAGDALENA), show a card with: method name, session count, % of total, average reliability (% isValid), top 3 dominant codes by frequency. Render as a grid of method cards. Add 'Exportar CSV' button with columns: Método,Cantidad,Porcentaje,Fiabilidad Promedio,Top Código 1,Top Código 2,Top Código 3.",
+
+    "STEP 11 - Shared CSV export helper: add a helper function exportCsv(headers: string[], rows: string[][], filename: string) at the top of ReportsClient.tsx that generates CSV with UTF-8 BOM (\\uFEFF prefix), wraps values in quotes, and triggers download via Blob + URL.createObjectURL + anchor click. Use this in all export buttons.",
+
+    "STEP 12 - CSS bar chart helper: add a helper component CssBar({ label, value, max, color }: { label: string, value: number, max: number, color?: string }) inline in ReportsClient.tsx. Renders a row with label, bar (filled div with width = (value/max)*100%), and count. Use this for all bar chart views. Fallback: if max===0, show 'Sin datos'.",
+
+    "STEP 13 - Update web/components/AdminClient.tsx: replace the existing reportes tab content (everything inside {tab === 'reportes' ? (...) : null}) with a single <ReportsClient sessions={sessions} cohorts={cohorts} /> render. Remove the now-redundant state variables (selectedReportCohort, generalReportStats useMemo, groupReportData useMemo, exportGroupCsv function, reportLoadedAt useMemo) from AdminClient. Keep the import of ReportsClient at the top. Also remove the import of reportLoadedAt if it's unused after the refactor. The tab button 'Reportes' stays in AdminClient.",
+
+    "STEP 14 - Add the lastUpdated display to ReportsClient itself (not AdminClient) using a useMemo(() => new Date(), []) inside ReportsClient for the 'Última actualización' banner.",
+
+    "STEP 15 - Verify the component compiles. Run: cd web && npm run typecheck && npm run test -- --run && npm run build."
+  ],
+  "acceptance_criteria": [
+    "web/components/ReportsClient.tsx exists and is a valid 'use client' React component",
+    "AdminClient.tsx imports and renders <ReportsClient sessions={sessions} cohorts={cohorts} /> in the reportes tab",
+    "ReportsClient has 7 sub-tabs: Dashboard, Por Usuario, Por Área, Por Grupo, Por Fecha, Por Carrera, Por Método",
+    "Dashboard shows 4 summary stat cards (total, esta semana, este mes, fiabilidad promedio)",
+    "Dashboard shows dominant code distribution as CSS bar chart",
+    "Dashboard shows RIASEC dimension averages (R,I,A,S,E,C) as CSS bars",
+    "Dashboard shows group comparison table",
+    "Dashboard has 'Imprimir / Guardar como PDF' button that calls window.print()",
+    "Por Usuario tab has search input and table with all required columns including link to /results/[id]",
+    "Por Usuario tab has Exportar CSV button (UTF-8 BOM, Spanish headers)",
+    "Por Área tab shows area distribution with CSS bars, filterable by method",
+    "Por Área tab has Exportar CSV button",
+    "Por Grupo tab enhances existing group report with RIASEC dimension averages and more columns",
+    "Por Grupo tab has Exportar CSV button with Spanish headers",
+    "Por Fecha tab has date range pickers and timeline bar chart",
+    "Por Fecha tab has Exportar CSV button",
+    "Por Carrera tab shows RIASEC career distribution as CSS bar chart",
+    "Por Carrera tab has Exportar CSV button",
+    "Por Método tab shows per-method stats cards",
+    "Por Método tab has Exportar CSV button",
+    "All CSV exports use UTF-8 BOM (\\uFEFF prefix) for Excel compatibility",
+    "All user-facing text is in Spanish",
+    "No new external npm dependencies added",
+    "tsc --noEmit passes clean",
+    "npm run test -- --run: 152 tests pass",
+    "npm run build passes without env vars"
+  ],
+  "verification": [
+    "cd web && PATH=/root/.nvm/versions/node/v22.23.2/bin:$PATH npm run typecheck",
+    "cd web && PATH=/root/.nvm/versions/node/v22.23.2/bin:$PATH npm run lint",
+    "cd web && PATH=/root/.nvm/versions/node/v22.23.2/bin:$PATH npm run test -- --run",
+    "cd web && PATH=/root/.nvm/versions/node/v22.23.2/bin:$PATH npm run build"
+  ],
+  "blocked_reason": null,
+  "findings": "Created web/components/ReportsClient.tsx with 7 sub-tabs (Dashboard, Por Usuario, Por Área, Por Grupo, Por Fecha, Por Carrera, Por Método). Each tab has CSV export with UTF-8 BOM. Dashboard has print button. Removed selectedReportCohort, reportLoadedAt, generalReportStats, groupReportData, and exportGroupCsv from AdminClient. All 4 verification commands passed: typecheck clean, lint clean, 152 tests pass, build succeeds."
+}
