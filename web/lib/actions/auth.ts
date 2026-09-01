@@ -98,7 +98,6 @@ export async function registerAction(params: {
 export interface LoginResult {
   ok: boolean;
   error?: string;
-  unverified?: boolean;
 }
 
 /**
@@ -130,11 +129,16 @@ export async function loginAction(params: {
     if (err instanceof AuthError) {
       const cause = (err as { cause?: { err?: { message?: string } } }).cause?.err?.message;
       if (cause === "cuenta_no_verificada") {
+        // La cuenta existe pero no está verificada (p.ej. creada antes del
+        // despliegue que eliminó la verificación por correo). Marcarla como
+        // verificada automáticamente y devolver un error genérico para que el
+        // usuario intente iniciar sesión de nuevo.
+        const { markEmailVerified } = await import("@/lib/auth/users");
+        await markEmailVerified(email);
         return {
           ok: false,
-          unverified: true,
           error:
-            "Tu cuenta aún no ha sido verificada. Revisa tu correo y haz clic en el enlace de confirmación.",
+            "Tu cuenta necesita ser activada. Por favor intenta iniciar sesión nuevamente.",
         };
       }
       return {

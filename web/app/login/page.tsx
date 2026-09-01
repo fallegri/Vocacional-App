@@ -1,8 +1,7 @@
 // ===========================================================================
 // Página de inicio de sesión con correo y contraseña.
 //
-// Invoca loginAction (server action). Si la cuenta no está verificada, muestra
-// el mensaje correspondiente con indicaciones para revisar el correo.
+// Invoca loginAction (server action). Muestra errores en español.
 // ===========================================================================
 
 "use client";
@@ -22,7 +21,6 @@ function LoginForm() {
   const [result, setResult] = useState<{
     ok: boolean;
     error?: string;
-    unverified?: boolean;
   } | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -68,23 +66,14 @@ function LoginForm() {
         <div
           role="alert"
           style={{
-            background: result.unverified ? "#fef3c7" : "#fee2e2",
-            border: `1px solid ${result.unverified ? "#d97706" : "#dc2626"}`,
+            background: "#fee2e2",
+            border: "1px solid #dc2626",
             borderRadius: 6,
             padding: "10px 12px",
             fontSize: 14,
           }}
         >
           {result.error}
-          {result.unverified && (
-            <p style={{ margin: "6px 0 0", fontSize: 13 }}>
-              Tu cuenta aún no está verificada. ¿No recibiste el correo?{" "}
-              <Link href="/register?resend=1" style={{ fontWeight: 600 }}>
-                Solicitar nuevo enlace de verificación
-              </Link>
-              .
-            </p>
-          )}
         </div>
       )}
 

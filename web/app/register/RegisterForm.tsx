@@ -19,7 +19,7 @@ export default function RegisterForm() {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [result, setResult] = useState<{ ok: boolean; error?: string } | null>(null);
+  const [result, setResult] = useState<{ ok: boolean; resent?: boolean; error?: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent) {
@@ -31,6 +31,26 @@ export default function RegisterForm() {
   }
 
   if (result?.ok) {
+    // Cuando resent === true, el registro detectó una cuenta existente sin
+    // verificar y la activó automáticamente. En ese caso mostramos la
+    // explicación correcta en lugar del mensaje genérico de cuenta creada.
+    if (result.resent) {
+      return (
+        <main style={{ maxWidth: 420, margin: "60px auto", padding: "0 16px" }}>
+          <h1 style={{ fontSize: 22, marginBottom: 12 }}>Cuenta encontrada</h1>
+          <p style={{ lineHeight: 1.6 }}>
+            {result.error ??
+              "Ya existe una cuenta con ese correo. Inicia sesión directamente."}
+          </p>
+          <p style={{ marginTop: 16 }}>
+            <Link href="/login" className="btn btn-primary">
+              Iniciar sesion
+            </Link>
+          </p>
+        </main>
+      );
+    }
+
     return (
       <main style={{ maxWidth: 420, margin: "60px auto", padding: "0 16px" }}>
         <h1 style={{ fontSize: 22, marginBottom: 12 }}>¡Cuenta creada!</h1>
