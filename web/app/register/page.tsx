@@ -7,9 +7,8 @@
 // en producción (Vercel), evitando el 404 que ocurre cuando el server action se
 // importa en un componente cliente anidado dentro de un Server Component.
 //
-// Cuando se navega con ?resend=1 (desde el aviso de cuenta no verificada en el
-// inicio de sesión), el formulario muestra el modo "Reenviar correo de
-// verificación" para reflejar que se reenviará el enlace a una cuenta existente.
+// El registro crea la cuenta directamente verificada. No se envia ningun
+// correo de confirmacion (Resend fue eliminado).
 // ===========================================================================
 
 import { Suspense } from "react";

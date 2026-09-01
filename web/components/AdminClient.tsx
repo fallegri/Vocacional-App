@@ -143,6 +143,10 @@ export default function AdminClient({
   // ----- Estado de reportes -----
   const [selectedReportCohort, setSelectedReportCohort] = useState<string>("ALL");
 
+  // Marca el momento en que los datos de sesiones se cargaron en el cliente.
+  // Se usa para mostrar el aviso de "Ultima actualizacion" en la pestaña Reportes.
+  const reportLoadedAt = useMemo(() => new Date(), []);
+
   // Base absoluta para los enlaces del QR (segura en SSR y en cliente).
   const origin = useMemo(() => {
     if (typeof window !== "undefined") return window.location.origin;
@@ -394,7 +398,9 @@ export default function AdminClient({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };  const handleRoleChange = (userId: string, role: UserRoleCode) => {
+  };
+
+  const handleRoleChange = (userId: string, role: UserRoleCode) => {
     setRoleDrafts((prev) => ({ ...prev, [userId]: role }));
   };
 
@@ -1012,6 +1018,19 @@ export default function AdminClient({
 
       {tab === "reportes" ? (
         <div className="stack" style={{ gap: 20 }}>
+          {/* Aviso de actualización: los datos reflejan el estado al cargar la pagina */}
+          <div className="alert alert-warning" role="note" style={{ fontSize: 13 }}>
+            Ultima actualizacion:{" "}
+            {reportLoadedAt.toLocaleString("es-ES", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+            . Los datos se cargan al abrir el panel. Recarga la pagina para obtener informacion actualizada.
+          </div>
+
           {/* Reporte General */}
           <div className="card">
             <h2 style={{ marginTop: 0 }}>Reporte General</h2>
