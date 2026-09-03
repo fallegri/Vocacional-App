@@ -205,6 +205,21 @@ export async function POST(request: Request) {
       ? body.startedAt
       : completedAt;
 
+  // Determina el estado de revisión inicial:
+  //   - Sesión de grupo (con cohortCode): COMPLETED (resultados inmediatos y
+  //     accesibles sin cuenta para el estudiante que acaba de completar el test)
+  //   - Estudiante individual autenticado (sin cohortCode): PENDING_AUTHORIZATION
+  //   - Demás casos (anónimo sin cohorte, staff): PENDING
+  const isIndividualStudent =
+    !body.cohortCode &&
+    currentUser !== null &&
+    !isStaffRole(currentUser.role);
+  const reviewStatus = body.cohortCode
+    ? "COMPLETED"
+    : isIndividualStudent
+      ? "PENDING_AUTHORIZATION"
+      : "PENDING";
+
   try {
     await persistSession({
       id,
@@ -221,6 +236,7 @@ export async function POST(request: Request) {
       studentEmail: ownerEmail,
       methodId,
       methodScores,
+      reviewStatus,
     });
   } catch (err) {
     const message =
@@ -228,5 +244,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  return NextResponse.json({ id }, { status: 201 });
+  return NextResponse.json(
+    { id, requiresAuthorization: reviewStatus === "PENDING_AUTHORIZATION" },
+    { status: 201 }
+  );
 }

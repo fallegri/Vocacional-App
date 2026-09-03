@@ -44,6 +44,8 @@ export interface ReadAuthResult {
 /** Forma mínima de una sesión necesaria para decidir la propiedad. */
 interface SessionLike {
   studentEmail: string | null;
+  cohortCode?: string | null;
+  reviewStatus?: string | null;
 }
 
 /** Normaliza un correo para comparaciones (trim + minúsculas). */
@@ -67,6 +69,12 @@ export async function authorizeSessionRead(
 
   const user = await getCurrentUser();
   if (!user) {
+    // Sesiones de grupo (cohortCode presente) o sesiones ya completadas son
+    // accesibles sin autenticación: el estudiante llega por QR y no tiene
+    // cuenta. Conocer el UUID de la sesión es prueba suficiente.
+    if (session.cohortCode || session.reviewStatus === "COMPLETED") {
+      return { ok: true, authConfigured: true, isStaff: false };
+    }
     return {
       ok: false,
       authConfigured: true,
@@ -84,6 +92,17 @@ export async function authorizeSessionRead(
   // STUDENT: solo puede leer su propia sesión (correo no nulo y coincidente).
   const ownerEmail = normalizeEmail(session.studentEmail);
   if (ownerEmail && ownerEmail === normalizeEmail(user.email)) {
+    // Si la sesión está pendiente de autorización, el estudiante no puede verla aún.
+    if (session.reviewStatus === "PENDING_AUTHORIZATION") {
+      return {
+        ok: false,
+        authConfigured: true,
+        isStaff: false,
+        user,
+        error:
+          "Tu solicitud está pendiente de autorización. Un administrador debe aprobarla antes de que puedas ver tus resultados.",
+      };
+    }
     return { ok: true, authConfigured: true, isStaff: false, user };
   }
 

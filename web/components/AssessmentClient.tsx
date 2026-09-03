@@ -81,10 +81,15 @@ export default function AssessmentClient({
   const [studentEmail, setStudentEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingAuth, setPendingAuth] = useState(false);
 
   // Marca de tiempo en que se mostró la pregunta actual, para medir timeSpentMs.
   const shownAtRef = useRef<number>(Date.now());
   const startedAtRef = useRef<number>(Date.now());
+
+  // Ref para la tarjeta de "Finalizar": permite desplazarse hasta ella al
+  // responder la última pregunta, evitando que el test parezca congelado.
+  const finishCardRef = useRef<HTMLDivElement>(null);
 
   // Al cambiar de método, se reinicia el cuestionario (respuestas y posición).
   useEffect(() => {
@@ -130,6 +135,17 @@ export default function AssessmentClient({
     // Avanza automáticamente a la siguiente pregunta sin responder.
     if (index < total - 1) {
       goTo(index + 1);
+    } else {
+      // Última pregunta: en lugar de avanzar, desplaza la tarjeta de Finalizar
+      // al centro de la pantalla para que el usuario la vea de inmediato.
+      setTimeout(
+        () =>
+          finishCardRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          }),
+        150
+      );
     }
   };
 
@@ -159,11 +175,24 @@ export default function AssessmentClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = (await res.json()) as { id?: string; error?: string };
+      const data = (await res.json()) as {
+        id?: string;
+        error?: string;
+        requiresAuthorization?: boolean;
+      };
       if (!res.ok || !data.id) {
         throw new Error(data.error ?? "No se pudo guardar la evaluación.");
       }
-      router.push(`/results/${data.id}`);
+      if (data.requiresAuthorization) {
+        setPendingAuth(true);
+        setSubmitting(false);
+        return;
+      }
+      if (cohortCode) {
+        window.location.href = `/results/${data.id}?group=1`;
+      } else {
+        router.push(`/results/${data.id}`);
+      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -353,7 +382,13 @@ export default function AssessmentClient({
         </div>
       ) : null}
 
-      <div className="card center">
+      <div
+        ref={finishCardRef}
+        className="card center"
+        style={{
+          border: allAnswered ? "2px solid var(--accent)" : undefined,
+        }}
+      >
         <p className="muted" style={{ marginTop: 0 }}>
           {allAnswered
             ? "¡Has respondido todas las preguntas! Puedes ver tus resultados."
@@ -368,6 +403,21 @@ export default function AssessmentClient({
           {submitting ? "Calculando resultados…" : "Finalizar y ver resultados"}
         </button>
       </div>
+
+      {pendingAuth ? (
+        <div className="card center">
+          <p style={{ fontSize: 20, marginBottom: 8 }}>✅</p>
+          <h2 style={{ marginTop: 0 }}>Evaluación registrada</h2>
+          <p>
+            Tu solicitud fue registrada. Un administrador debe autorizarla para
+            que puedas ver tus resultados.
+          </p>
+          <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>
+            Una vez autorizada, podrás acceder a tus resultados iniciando sesión
+            con tu cuenta.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

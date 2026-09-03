@@ -103,6 +103,7 @@ describe("Página /results/[sessionId] (cableado de la guarda de lectura)", () =
     currentUser = { email: "intruso@x.com", role: "STUDENT" };
     const element = await ResultsPage({
       params: Promise.resolve({ sessionId: "sess-1" }),
+      searchParams: Promise.resolve({}),
     });
     // El nodo devuelto debe ser el componente de acceso restringido, no el
     // perfil vocacional. Si se quita la guarda, la página mostraría el perfil.

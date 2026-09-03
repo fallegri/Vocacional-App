@@ -44,8 +44,10 @@ function reliabilityClass(level: string): string {
 
 export default async function ResultsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ sessionId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { sessionId } = await params;
 
@@ -92,22 +94,28 @@ export default async function ResultsPage({
   // Autorización de lectura: en modo demo (sin OAuth) se preserva el acceso
   // abierto; con OAuth configurado, solo el dueño (por correo) o el personal
   // (staff) pueden ver los resultados.
-  const readAuth = await authorizeSessionRead(session);
-  if (!readAuth.ok) {
-    // Un visitante con sesión que NO es dueño (ni personal) recibe el mensaje
-    // específico de propiedad que ya produjo la guarda ("No tienes permisos
-    // para ver los resultados de esta evaluación."), en lugar del texto genérico
-    // orientado al área de administración. Un visitante sin sesión conserva el
-    // texto por defecto con el botón de inicio de sesión.
-    const isNonOwner = Boolean(readAuth.user);
-    return (
-      <AccessRestricted
-        redirectTo={`/results/${sessionId}`}
-        signedIn={isNonOwner}
-        title={isNonOwner ? "Resultados no disponibles" : "Acceso restringido"}
-        message={isNonOwner ? readAuth.error : undefined}
-      />
-    );
+  // Acceso de grupo (?group=1): el estudiante acaba de completar el test vía QR
+  // y no tiene cuenta — se muestra el resultado directamente sin verificar
+  // autoría, ya que conocer el UUID es prueba suficiente.
+  const isGroupAccess = (await searchParams)?.group === "1";
+  if (!isGroupAccess) {
+    const readAuth = await authorizeSessionRead(session);
+    if (!readAuth.ok) {
+      // Un visitante con sesión que NO es dueño (ni personal) recibe el mensaje
+      // específico de propiedad que ya produjo la guarda ("No tienes permisos
+      // para ver los resultados de esta evaluación."), en lugar del texto genérico
+      // orientado al área de administración. Un visitante sin sesión conserva el
+      // texto por defecto con el botón de inicio de sesión.
+      const isNonOwner = Boolean(readAuth.user);
+      return (
+        <AccessRestricted
+          redirectTo={`/results/${sessionId}`}
+          signedIn={isNonOwner}
+          title={isNonOwner ? "Resultados no disponibles" : "Acceso restringido"}
+          message={isNonOwner ? readAuth.error : undefined}
+        />
+      );
+    }
   }
 
   // ---------------------------------------------------------------------
