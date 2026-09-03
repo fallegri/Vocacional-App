@@ -72,6 +72,8 @@ export interface PersistSessionInput {
   methodId?: MethodId;
   /** Puntajes genéricos por dimensión para métodos distintos de RIASEC. */
   methodScores?: StoredMethodScores | null;
+  /** Estado de revisión inicial. Por defecto 'PENDING'. */
+  reviewStatus?: string;
 }
 
 /**
@@ -131,7 +133,7 @@ export async function persistSession(input: PersistSessionInput): Promise<void> 
         input.cohortCode ?? null,
         input.studentName ?? null,
         input.studentEmail ?? null,
-        "PENDING",
+        input.reviewStatus ?? "PENDING",
         input.methodId ?? "RIASEC",
         input.methodScores ? JSON.stringify(input.methodScores) : null,
       ]

@@ -2,7 +2,7 @@
   "id": "FEAT-003",
   "type": "feat",
   "description": "Add Reportes tab to AdminClient with general report and group report with CSV export. Pure client-side aggregation from the already-passed initialSessions data. No new API calls needed.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. In web/components/AdminClient.tsx: add 'reportes' to TabKey type: type TabKey = 'evaluaciones' | 'grupos' | 'usuarios' | 'reportes'.",
     "2. Add a 'Reportes' tab button in the tabs row (after 'Usuarios').",
@@ -28,5 +28,5 @@
     "cd web && npm run build"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Implemented successfully. Added 'reportes' to TabKey type, Reportes tab button after Usuarios, selectedReportCohort state, two useMemo blocks (generalReportStats for total/byMethod/byStatus/top5Codes, groupReportData for filtered sessions and topCode), exportGroupCsv function using Blob+URL.createObjectURL pattern with Spanish CSV headers, and the full Reportes tab JSX with General Report section (stat card, method table with %, review status table, top 5 codes table) and Group Report section (cohort selector, sessions table with 6 columns, summary stats card, Exportar CSV button). All 152 tests pass, tsc --noEmit clean, lint clean, build passes."
 }

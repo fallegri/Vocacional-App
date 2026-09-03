@@ -1,0 +1,14 @@
+{
+  "task_id": "task-reports-module",
+  "task_description": "Full reports module for OrientApp admin panel: extract reports into ReportsClient.tsx component, add Dashboard view with summary cards and CSS bar charts, and 6 filterable sub-reports (Por Usuario, Por Área, Por Grupo, Por Fecha, Por Carrera, Por Método) each with CSV export capability. Print/PDF export for dashboard. All text in Spanish. No new external npm deps.",
+  "status": "completed",
+  "feature_order": ["FEAT-001"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "152 Vitest tests green (15 files), tsc --noEmit clean, next lint 0 warnings/errors, no-env build succeeds. 2-pass review cycle: v1 found AreaTab char-splitting for TIPOV/CIPR/MAGDALENA (fixed) and CHASIDE label collision in ALL view (fixed in commit f7c7135). v2 rendered APPROVED with 2 non-blocking notes: deleted-cohort sessions have no GrupoTab filter option (cosmetic), and SIN GRUPO sentinel label in Dashboard group comparison (cosmetic). All 7 report sub-tabs shipped: Dashboard (4 stat cards + CSS bar charts + RIASEC dimension avgs + group comparison + print button), Por Usuario (search+table+CSV), Por Área (method-aware frequency bars with proper RIASEC/CHASIDE labels + CSV), Por Grupo (cohort selector + RIASEC avgs + CSV), Por Fecha (date range + timeline bars + CSV), Por Carrera (RIASEC career distribution + CSV), Por Método (per-method cards + CSV). All CSV exports use UTF-8 BOM."
+  }
+}

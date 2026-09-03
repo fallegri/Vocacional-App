@@ -1,0 +1,14 @@
+{
+  "task_id": "task-qr-flow-individual-auth-reports",
+  "task_description": "Implement QR group flow (immediate results for anonymous students), individual flow (PENDING_AUTHORIZATION status requiring admin approval), remove Resend email completely, and add Reportes tab in admin panel with general and group reports plus CSV export.",
+  "status": "completed",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "152 Vitest tests green (15 files), tsc --noEmit clean, next lint 0 warnings/errors, no-env build succeeds. 3-pass review cycle: v1 found stale Resend copy + formatting + staleness UX (fixed in commit 07642de). v2 found dead unverified login branch + /verify dead-end route + swallowed resent message (fixed in commit 82d2ba3). v3 rendered APPROVED with 3 non-blocking notes (CSV UTF-8 BOM, dead verifyEmailAction export, two-attempt legacy login UX). All features shipped: QR group flow with anonymous immediate results, individual PENDING_AUTHORIZATION flow, Resend fully removed, Reportes tab with general/group stats and CSV export."
+  }
+}

@@ -223,13 +223,17 @@ export type ReviewStatusCode =
   | "PENDING"
   | "IN_REVIEW"
   | "APPROVED"
-  | "NEEDS_FOLLOWUP";
+  | "NEEDS_FOLLOWUP"
+  | "PENDING_AUTHORIZATION"
+  | "AUTHORIZED";
 
 export const REVIEW_STATUS: Record<ReviewStatusCode, { displayName: string }> = {
   PENDING: { displayName: "Pendiente de Revisión" },
   IN_REVIEW: { displayName: "En Auditoría" },
   APPROVED: { displayName: "Dictamen Aprobado" },
   NEEDS_FOLLOWUP: { displayName: "Requiere Entrevista" },
+  PENDING_AUTHORIZATION: { displayName: "Pendiente de Autorización" },
+  AUTHORIZED: { displayName: "Autorizado" },
 };
 
 export interface AppUser {

@@ -2,7 +2,7 @@
   "id": "FEAT-001",
   "type": "chore",
   "description": "Remove Resend email completely from the codebase. Remove from POST /api/sessions/route.ts (the best-effort email block), from registerAction in web/lib/actions/auth.ts (remove sendVerificationEmail import and call, make registration succeed without email verification - mark user as verified immediately or skip the email step), delete or empty web/lib/email/client.ts and web/lib/email/messages.ts, remove resend from package.json, update .env.example and web/README.md, update all affected tests.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "1. In web/app/api/sessions/route.ts: remove the entire 'if (ownerEmail)' block that does 'const { sendResultsEmailTo } = await import(\"@/lib/email/client\")' and the surrounding try/catch. The route should return NextResponse.json({ id }, { status: 201 }) immediately after persistSession succeeds.",
     "2. In web/lib/actions/auth.ts (registerAction): remove the lazy import of sendVerificationEmail from @/lib/email/client. Remove the call to createVerificationToken and sendVerificationEmail for new users (the try/catch block at the end of the new-user path). Remove the similar block in the 'resent' path for unverified existing users. IMPORTANT: registration must still work - since email verification is removed, mark users as verified immediately. In createUser call (web/lib/auth/users.ts already exists - check if it accepts an emailVerifiedAt param) OR simply call markEmailVerified(email) right after createUser succeeds. For the 'resent' path (unverified existing user), remove the token/email sending and just return the same message without sending email.",
@@ -32,5 +32,5 @@
     "cd web && npm run test -- --run"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Completed successfully. Removed Resend email integration from sessions route and registerAction. Deleted lib/email/client.ts and lib/email/messages.ts. Updated package.json (removed 'resend'), ran npm install. Added markEmailVerified call after createUser so accounts are verified immediately. Updated register-action.test.ts: removed email mocks, added markEmailVerified mock, removed email-client.test.ts and email-messages.test.ts test files. All 149 tests pass, tsc --noEmit clean. Committed and pushed to origin/main."
 }

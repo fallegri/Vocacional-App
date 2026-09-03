@@ -55,6 +55,15 @@ function sessionWithOwner(studentEmail: string | null) {
   return { studentEmail };
 }
 
+/** Sesión completa con correo, cohortCode y reviewStatus. */
+function sessionFull(
+  studentEmail: string | null,
+  cohortCode: string | null = null,
+  reviewStatus: string | null = "PENDING"
+) {
+  return { studentEmail, cohortCode, reviewStatus };
+}
+
 beforeEach(() => {
   for (const k of ENV_KEYS) delete process.env[k];
   currentUser = null;
@@ -123,5 +132,36 @@ describe("authorizeSessionRead", () => {
     const res = await authorizeSessionRead(sessionWithOwner(null));
     expect(res.ok).toBe(false);
     expect(res.error).toBeTruthy();
+  });
+
+  it("(7) sesión de grupo (cohortCode presente) con usuario anónimo: ok true", async () => {
+    configureOAuth();
+    currentUser = null;
+    const res = await authorizeSessionRead(
+      sessionFull(null, "ABC123", "PENDING")
+    );
+    expect(res.ok).toBe(true);
+    expect(res.authConfigured).toBe(true);
+    expect(res.isStaff).toBe(false);
+  });
+
+  it("(8) STUDENT dueño de sesión PENDING_AUTHORIZATION: ok false con mensaje en español", async () => {
+    configureOAuth();
+    currentUser = { email: "alumno@x.com", role: "STUDENT" };
+    const res = await authorizeSessionRead(
+      sessionFull("alumno@x.com", null, "PENDING_AUTHORIZATION")
+    );
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/pendiente de autorización/i);
+  });
+
+  it("(9) STUDENT dueño de sesión AUTHORIZED: ok true", async () => {
+    configureOAuth();
+    currentUser = { email: "alumno@x.com", role: "STUDENT" };
+    const res = await authorizeSessionRead(
+      sessionFull("alumno@x.com", null, "AUTHORIZED")
+    );
+    expect(res.ok).toBe(true);
+    expect(res.isStaff).toBe(false);
   });
 });

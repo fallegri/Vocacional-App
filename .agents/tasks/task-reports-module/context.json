@@ -1,0 +1,22 @@
+{
+  "project_type": "Next.js 15 app router, React 19, TypeScript, server + client components",
+  "language": "TypeScript / TSX",
+  "build_system": "npm in web/. Next.js app router. No Docker.",
+  "test_framework": "Vitest 3 with test files in web/tests/. Run with: cd web && npm run test -- --run",
+  "build_command": "cd web && npm run build (no env vars needed)",
+  "test_command": "cd web && npm run test -- --run",
+  "verification_instructions": "1) cd web && npm run typecheck (tsc --noEmit). 2) cd web && npm run lint. 3) cd web && npm run test -- --run (152 tests must pass). 4) cd web && npm run build.",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "Node at /root/.nvm/versions/node/v22.23.2/bin/node. npm available in PATH once invoked as PATH=/root/.nvm/versions/node/v22.23.2/bin:$PATH.",
+  "environment_constraints": "INTEGRATIONS_ONLY network mode. No external npm deps allowed. Node binary: /root/.nvm/versions/node/v22.23.2/bin/node. npm: /root/.nvm/versions/node/v22.23.2/bin/npm. Run commands with PATH=/root/.nvm/versions/node/v22.23.2/bin:$PATH prefix or use full paths. No chart libraries - use CSS bars or inline SVG only.",
+  "contribution_requirements": "All user-facing text in Spanish. No new external npm dependencies. Keep no-env build invariant (query() must not be called at import time). 152 tests must remain green. tsc --noEmit clean.",
+  "key_patterns": "AdminClient.tsx is a large 'use client' component (~1316 lines). Sessions data comes via initialSessions prop (SessionSummary[]). SessionSummary has: id, startedAt, completedAt, isValid, reliabilityLevel, scores{r,i,a,s,e,c} (RIASEC only), dominantCode, topCareerTitle (RIASEC only), cohortCode, studentName, studentEmail, reviewerNotes, reviewStatus, methodId. Methods: RIASEC, CHASIDE, TIPOV, CIPR, MAGDALENA. REVIEW_STATUS, USER_ROLES from lib/riasec/types. CohortGroup from lib/riasec/types. CSV export uses Blob + URL.createObjectURL + anchor click with UTF-8 BOM (\\uFEFF). All CSS uses class names: card, card-muted, btn, btn-secondary, badge, chip, label, input, select, textarea, alert alert-warning, alert alert-ok, grid grid-2, grid grid-3, row, row spread, stack, center, muted. formatDate helper already in AdminClient. Export pattern already in exportGroupCsv() in AdminClient. useMemo for all computed data.",
+  "relevant_files": [
+    "web/components/AdminClient.tsx",
+    "web/lib/sessions.ts",
+    "web/app/admin/page.tsx",
+    "web/data/seed.ts",
+    "web/lib/riasec/types.ts"
+  ],
+  "directory_structure": "web/app/ (Next.js pages), web/components/ (client components incl. AdminClient.tsx), web/lib/ (server utilities, sessions.ts, db.ts, riasec/types.ts), web/data/seed.ts (careers, questions, cohorts), web/tests/ (vitest tests)"
+}
