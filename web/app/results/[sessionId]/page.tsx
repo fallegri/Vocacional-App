@@ -1,6 +1,8 @@
 import Link from "next/link";
 import RadarChart from "@/components/RadarChart";
 import AccessRestricted from "@/components/AccessRestricted";
+import AutoPrint from "@/components/AutoPrint";
+import PrintButton from "@/components/PrintButton";
 import {
   loadSession,
   type StoredSession,
@@ -97,7 +99,9 @@ export default async function ResultsPage({
   // Acceso de grupo (?group=1): el estudiante acaba de completar el test vía QR
   // y no tiene cuenta — se muestra el resultado directamente sin verificar
   // autoría, ya que conocer el UUID es prueba suficiente.
-  const isGroupAccess = (await searchParams)?.group === "1";
+  const resolvedSearchParams = await searchParams;
+  const isGroupAccess = resolvedSearchParams?.group === "1";
+  const isPrintMode = resolvedSearchParams?.print === "1";
   if (!isGroupAccess) {
     const readAuth = await authorizeSessionRead(session);
     if (!readAuth.ok) {
@@ -123,7 +127,7 @@ export default async function ResultsPage({
   // construida a partir de method_scores (sin radar/carreras/AI RIASEC).
   // ---------------------------------------------------------------------
   if (session.methodId !== "RIASEC") {
-    return <GenericMethodResults session={session} />;
+    return <GenericMethodResults session={session} isPrintMode={isPrintMode} />;
   }
 
   const matches = matchCareers(session.scores, CAREERS);
@@ -140,7 +144,10 @@ export default async function ResultsPage({
             {session.cohortCode ? ` · Grupo ${session.cohortCode}` : ""}
           </p>
         </div>
-        <span className="badge">Código dominante: {session.dominantCode}</span>
+        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+          <PrintButton />
+          <span className="badge">Código dominante: {session.dominantCode}</span>
+        </div>
       </div>
 
       {/* Confiabilidad y advertencia */}
@@ -237,6 +244,7 @@ export default async function ResultsPage({
           </Link>
         </div>
       </div>
+      {isPrintMode ? <AutoPrint /> : null}
     </main>
   );
 }
@@ -250,8 +258,10 @@ export default async function ResultsPage({
  */
 function GenericMethodResults({
   session,
+  isPrintMode = false,
 }: {
   session: StoredSession;
+  isPrintMode?: boolean;
 }) {
   const ms = session.methodScores;
 
@@ -302,9 +312,12 @@ function GenericMethodResults({
             {session.cohortCode ? ` · Grupo ${session.cohortCode}` : ""}
           </p>
         </div>
-        <span className="badge" data-testid="method-badge">
-          Método: {session.methodId}
-        </span>
+        <div className="row" style={{ gap: 8, alignItems: "center" }}>
+          <PrintButton />
+          <span className="badge" data-testid="method-badge">
+            Método: {session.methodId}
+          </span>
+        </div>
       </div>
 
       {session.dominantCode ? (
@@ -364,6 +377,7 @@ function GenericMethodResults({
           {ms.interpretation || session.dominantSummary || "Sin interpretación disponible."}
         </p>
       </div>
+      {isPrintMode ? <AutoPrint /> : null}
     </main>
   );
 }

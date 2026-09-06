@@ -623,6 +623,14 @@ export default function AdminClient({
                       >
                         Ver diagnóstico
                       </a>
+                      <a
+                        className="btn btn-secondary"
+                        href={`/results/${encodeURIComponent(s.id)}?print=1`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Exportar / Imprimir
+                      </a>
                     </div>
                   </article>
                 );

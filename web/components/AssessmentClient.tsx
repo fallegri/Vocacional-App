@@ -79,6 +79,9 @@ export default function AssessmentClient({
   );
   const [studentName, setStudentName] = useState("");
   const [studentEmail, setStudentEmail] = useState("");
+  const [studentPhone, setStudentPhone] = useState("");
+  const [contactError, setContactError] = useState<string | null>(null);
+  const [infoConfirmed, setInfoConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingAuth, setPendingAuth] = useState(false);
@@ -167,6 +170,7 @@ export default function AssessmentClient({
         cohortCode: cohortCode ?? null,
         studentName: studentName.trim() || null,
         studentEmail: studentEmail.trim() || null,
+        studentPhone: studentPhone.trim() || null,
         startedAt: startedAtRef.current,
         methodId,
       };
@@ -213,6 +217,22 @@ export default function AssessmentClient({
   const highLabel = isRiasec
     ? "5 · Máximo interés"
     : `${scaleOptions[scaleOptions.length - 1]?.label ?? ""}`;
+
+  const handleConfirmContact = () => {
+    const name = studentName.trim();
+    const email = studentEmail.trim();
+    const phone = studentPhone.trim();
+    if (name.length < 2) {
+      setContactError("Por favor ingresa tu nombre completo (mínimo 2 caracteres).");
+      return;
+    }
+    if (!email && !phone) {
+      setContactError("Debes ingresar al menos un correo electrónico o un número de teléfono.");
+      return;
+    }
+    setContactError(null);
+    setInfoConfirmed(true);
+  };
 
   return (
     <div className="stack" style={{ gap: 20 }}>
@@ -274,150 +294,188 @@ export default function AssessmentClient({
             </>
           )}
         </div>
-
-        <div className="grid grid-2" style={{ marginTop: 16 }}>
-          <div>
-            <label className="label" htmlFor="student-name">
-              Nombre (opcional)
-            </label>
-            <input
-              id="student-name"
-              className="input"
-              value={studentName}
-              onChange={(e) => setStudentName(e.target.value)}
-              placeholder="Tu nombre completo"
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="student-email">
-              Correo (opcional)
-            </label>
-            <input
-              id="student-email"
-              className="input"
-              type="email"
-              value={studentEmail}
-              onChange={(e) => setStudentEmail(e.target.value)}
-              placeholder="tu.correo@ejemplo.com"
-            />
-          </div>
-        </div>
       </div>
 
-      <div className="card">
-        <div className="row spread" style={{ marginBottom: 8 }}>
-          <span className="muted">
-            Pregunta {index + 1} de {total}
-          </span>
-          <span className="muted">
-            {answeredCount} / {total} respondidas
-          </span>
-        </div>
-        <div className="progress-track" aria-hidden>
-          <div className="progress-fill" style={{ width: `${progress}%` }} />
-        </div>
-
-        <div style={{ marginTop: 20 }}>
-          <span
-            className="chip"
-            style={{ color: chipColor, borderColor: chipColor }}
-          >
-            {chipTitle}
-          </span>
-          <p
-            data-testid="question-text"
-            style={{ fontSize: 20, fontWeight: 600, marginTop: 12 }}
-          >
-            {question.text}
+      {!infoConfirmed ? (
+        <div className="card">
+          <h2 style={{ marginTop: 0 }}>Datos de contacto</h2>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Necesitamos tus datos para enviarte los resultados de tu diagnóstico.
           </p>
+          <div className="stack" style={{ gap: 12 }}>
+            <div>
+              <label className="label" htmlFor="student-name">
+                Nombre completo <span style={{ color: "var(--danger, #dc2626)" }}>*</span>
+              </label>
+              <input
+                id="student-name"
+                className="input"
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+                placeholder="Tu nombre completo"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="student-email">
+                Correo electrónico
+              </label>
+              <input
+                id="student-email"
+                className="input"
+                type="email"
+                value={studentEmail}
+                onChange={(e) => setStudentEmail(e.target.value)}
+                placeholder="tu.correo@ejemplo.com"
+              />
+            </div>
+            <div>
+              <label className="label" htmlFor="student-phone">
+                Teléfono
+              </label>
+              <input
+                id="student-phone"
+                className="input"
+                type="tel"
+                value={studentPhone}
+                onChange={(e) => setStudentPhone(e.target.value)}
+                placeholder="Ej. +506 8888-8888"
+              />
+            </div>
+            <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+              Al menos uno es obligatorio (correo o teléfono).
+            </p>
+            <button
+              type="button"
+              className="btn"
+              onClick={handleConfirmContact}
+            >
+              Comenzar test
+            </button>
+            {contactError ? (
+              <div className="alert alert-danger" role="alert">
+                {contactError}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="card">
+            <div className="row spread" style={{ marginBottom: 8 }}>
+              <span className="muted">
+                Pregunta {index + 1} de {total}
+              </span>
+              <span className="muted">
+                {answeredCount} / {total} respondidas
+              </span>
+            </div>
+            <div className="progress-track" aria-hidden>
+              <div className="progress-fill" style={{ width: `${progress}%` }} />
+            </div>
+
+            <div style={{ marginTop: 20 }}>
+              <span
+                className="chip"
+                style={{ color: chipColor, borderColor: chipColor }}
+              >
+                {chipTitle}
+              </span>
+              <p
+                data-testid="question-text"
+                style={{ fontSize: 20, fontWeight: 600, marginTop: 12 }}
+              >
+                {question.text}
+              </p>
+
+              <div
+                className="likert"
+                role="group"
+                aria-label={`Escala de respuesta ${method.name}`}
+              >
+                {scaleOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={
+                      currentAnswer?.score === opt.value ? "selected" : undefined
+                    }
+                    onClick={() => recordAnswer(opt.value)}
+                  >
+                    <div>{opt.value}</div>
+                    <div style={{ fontSize: 11, fontWeight: 500 }}>{opt.label}</div>
+                  </button>
+                ))}
+              </div>
+              <div className="likert-scale-labels">
+                <span>{lowLabel}</span>
+                <span>{highLabel}</span>
+              </div>
+            </div>
+
+            <div className="row spread" style={{ marginTop: 20 }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => goTo(index - 1)}
+                disabled={index === 0}
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => goTo(index + 1)}
+                disabled={index === total - 1}
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+
+          {error ? (
+            <div className="alert alert-danger" role="alert">
+              {error}
+            </div>
+          ) : null}
 
           <div
-            className="likert"
-            role="group"
-            aria-label={`Escala de respuesta ${method.name}`}
+            ref={finishCardRef}
+            className="card center"
+            style={{
+              border: allAnswered ? "2px solid var(--accent)" : undefined,
+            }}
           >
-            {scaleOptions.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                className={
-                  currentAnswer?.score === opt.value ? "selected" : undefined
-                }
-                onClick={() => recordAnswer(opt.value)}
-              >
-                <div>{opt.value}</div>
-                <div style={{ fontSize: 11, fontWeight: 500 }}>{opt.label}</div>
-              </button>
-            ))}
+            <p className="muted" style={{ marginTop: 0 }}>
+              {allAnswered
+                ? "¡Has respondido todas las preguntas! Puedes ver tus resultados."
+                : `Te faltan ${total - answeredCount} preguntas por responder.`}
+            </p>
+            <button
+              type="button"
+              className="btn"
+              onClick={handleSubmit}
+              disabled={!allAnswered || submitting}
+            >
+              {submitting ? "Calculando resultados…" : "Finalizar y ver resultados"}
+            </button>
           </div>
-          <div className="likert-scale-labels">
-            <span>{lowLabel}</span>
-            <span>{highLabel}</span>
-          </div>
-        </div>
 
-        <div className="row spread" style={{ marginTop: 20 }}>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => goTo(index - 1)}
-            disabled={index === 0}
-          >
-            Anterior
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={() => goTo(index + 1)}
-            disabled={index === total - 1}
-          >
-            Siguiente
-          </button>
-        </div>
-      </div>
-
-      {error ? (
-        <div className="alert alert-danger" role="alert">
-          {error}
-        </div>
-      ) : null}
-
-      <div
-        ref={finishCardRef}
-        className="card center"
-        style={{
-          border: allAnswered ? "2px solid var(--accent)" : undefined,
-        }}
-      >
-        <p className="muted" style={{ marginTop: 0 }}>
-          {allAnswered
-            ? "¡Has respondido todas las preguntas! Puedes ver tus resultados."
-            : `Te faltan ${total - answeredCount} preguntas por responder.`}
-        </p>
-        <button
-          type="button"
-          className="btn"
-          onClick={handleSubmit}
-          disabled={!allAnswered || submitting}
-        >
-          {submitting ? "Calculando resultados…" : "Finalizar y ver resultados"}
-        </button>
-      </div>
-
-      {pendingAuth ? (
-        <div className="card center">
-          <p style={{ fontSize: 20, marginBottom: 8 }}>✅</p>
-          <h2 style={{ marginTop: 0 }}>Evaluación registrada</h2>
-          <p>
-            Tu solicitud fue registrada. Un administrador debe autorizarla para
-            que puedas ver tus resultados.
-          </p>
-          <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>
-            Una vez autorizada, podrás acceder a tus resultados iniciando sesión
-            con tu cuenta.
-          </p>
-        </div>
-      ) : null}
+          {pendingAuth ? (
+            <div className="card center">
+              <p style={{ fontSize: 20, marginBottom: 8 }}>✅</p>
+              <h2 style={{ marginTop: 0 }}>Evaluación registrada</h2>
+              <p>
+                Tu solicitud fue registrada. Un administrador debe autorizarla para
+                que puedas ver tus resultados.
+              </p>
+              <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>
+                Una vez autorizada, podrás acceder a tus resultados iniciando sesión
+                con tu cuenta.
+              </p>
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   );
 }

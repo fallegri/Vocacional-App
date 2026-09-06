@@ -48,6 +48,7 @@ export interface StoredSession {
   cohortCode: string | null;
   studentName: string | null;
   studentEmail: string | null;
+  studentPhone: string | null;
   reviewStatus: string | null;
   /** Método vocacional usado (RIASEC por defecto para filas antiguas). */
   methodId: MethodId;
@@ -68,6 +69,7 @@ export interface PersistSessionInput {
   cohortCode?: string | null;
   studentName?: string | null;
   studentEmail?: string | null;
+  studentPhone?: string | null;
   /** Método vocacional usado (RIASEC por defecto). */
   methodId?: MethodId;
   /** Puntajes genéricos por dimensión para métodos distintos de RIASEC. */
@@ -102,15 +104,15 @@ export async function persistSession(input: PersistSessionInput): Promise<void> 
           r_score, i_score, a_score, s_score, e_score, c_score,
           dominant_code, dominant_summary, warning_message,
           top_career_title, top_career_affinity,
-          cohort_code, student_name, student_email, review_status,
+          cohort_code, student_name, student_email, student_phone, review_status,
           method_id, method_scores
        ) VALUES (
           $1, $2, $3, $4, $5,
           $6, $7, $8, $9, $10, $11,
           $12, $13, $14,
           $15, $16,
-          $17, $18, $19, $20,
-          $21, $22
+          $17, $18, $19, $20, $21,
+          $22, $23
        )
        ON CONFLICT (id) DO NOTHING`,
       [
@@ -133,6 +135,7 @@ export async function persistSession(input: PersistSessionInput): Promise<void> 
         input.cohortCode ?? null,
         input.studentName ?? null,
         input.studentEmail ?? null,
+        input.studentPhone ?? null,
         input.reviewStatus ?? "PENDING",
         input.methodId ?? "RIASEC",
         input.methodScores ? JSON.stringify(input.methodScores) : null,
@@ -206,6 +209,7 @@ export interface SessionSummary {
   cohortCode: string | null;
   studentName: string | null;
   studentEmail: string | null;
+  studentPhone: string | null;
   reviewerNotes: string | null;
   reviewStatus: string | null;
   /** Método vocacional usado (RIASEC por defecto para filas antiguas). */
@@ -224,7 +228,7 @@ export async function listSessions(): Promise<SessionSummary[]> {
       `SELECT id, started_at, completed_at, is_valid, reliability_level,
               r_score, i_score, a_score, s_score, e_score, c_score,
               dominant_code, top_career_title,
-              cohort_code, student_name, student_email,
+              cohort_code, student_name, student_email, student_phone,
               reviewer_notes, review_status, method_id
          FROM assessment_sessions
         ORDER BY COALESCE(completed_at, started_at) DESC
@@ -256,6 +260,7 @@ export async function listSessions(): Promise<SessionSummary[]> {
     cohortCode: str(row.cohort_code),
     studentName: str(row.student_name),
     studentEmail: str(row.student_email),
+    studentPhone: str(row.student_phone),
     reviewerNotes: str(row.reviewer_notes),
     reviewStatus: str(row.review_status),
     methodId: normalizeMethodId(row.method_id),
@@ -290,7 +295,7 @@ export async function loadSession(
             r_score, i_score, a_score, s_score, e_score, c_score,
             dominant_code, dominant_summary, warning_message,
             top_career_title, top_career_affinity,
-            cohort_code, student_name, student_email, review_status,
+            cohort_code, student_name, student_email, student_phone, review_status,
             method_id, method_scores
        FROM assessment_sessions
       WHERE id = $1
@@ -328,6 +333,7 @@ export async function loadSession(
     cohortCode: str(row.cohort_code),
     studentName: str(row.student_name),
     studentEmail: str(row.student_email),
+    studentPhone: str(row.student_phone),
     reviewStatus: str(row.review_status),
     methodId: normalizeMethodId(row.method_id),
     methodScores: parseMethodScores(row.method_scores),

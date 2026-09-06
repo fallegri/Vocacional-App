@@ -35,6 +35,7 @@ interface CreateSessionBody {
   cohortCode?: string | null;
   studentName?: string | null;
   studentEmail?: string | null;
+  studentPhone?: string | null;
   startedAt?: number;
   methodId?: string | null;
 }
@@ -234,6 +235,7 @@ export async function POST(request: Request) {
       cohortCode: body.cohortCode ?? null,
       studentName: body.studentName ?? null,
       studentEmail: ownerEmail,
+      studentPhone: body.studentPhone ?? null,
       methodId,
       methodScores,
       reviewStatus,

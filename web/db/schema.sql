@@ -52,6 +52,8 @@ ALTER TABLE assessment_sessions
     ADD COLUMN IF NOT EXISTS method_id TEXT NOT NULL DEFAULT 'RIASEC';
 ALTER TABLE assessment_sessions
     ADD COLUMN IF NOT EXISTS method_scores JSONB;
+ALTER TABLE assessment_sessions
+    ADD COLUMN IF NOT EXISTS student_phone TEXT;
 
 -- ---------------------------------------------------------------------------
 -- Respuestas individuales (assessment_responses)
