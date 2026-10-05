@@ -1,0 +1,31 @@
+{
+  "project_type": "Next.js 14 full-stack web app (App Router, TypeScript, Vitest)",
+  "language": "TypeScript / TSX",
+  "build_system": "npm (in web/), Next.js App Router with edge/node runtime",
+  "test_framework": "Vitest with test files in web/tests/",
+  "build_command": "cd web && npm run build",
+  "test_command": "cd web && npm run test -- --run",
+  "verification_instructions": "1. cd web && npx tsc --noEmit  2. npm run lint  3. npm run test -- --run  4. npm run build (no env vars needed)",
+  "snapshot_or_generated_files": null,
+  "setup_instructions": "Node is at /root/.nvm/versions/node/v22.23.3/bin/node. npm in web/. No extra setup needed.",
+  "environment_constraints": "No env vars available at build time. All DB/auth access must be lazy (runtime only). No docker daemon. Branch is main, push directly to origin/main.",
+  "contribution_requirements": "All user-facing text in Spanish. Keep no-env build invariant (no env var reads at module load). tsc --noEmit must pass. npm run lint must pass. All tests must pass. npm run build must succeed without env vars.",
+  "key_patterns": "1. API routes use authorizeStaffRequest(request) from web/lib/auth/staff.ts for staff-only endpoints. 2. DB queries use query() from web/lib/db.ts (lazy, runtime only). 3. Client components are 'use client', data imported from pure TS data files is fine. 4. exportCsv() helper exists in ReportsClient.tsx. 5. METHODS registry in web/lib/methods/registry.ts has all 5 methods with .scale.options. 6. All user-facing strings in Spanish. 7. Method question banks: RIASEC in QUESTIONS (web/data/seed.ts via RIASEC_METHOD.questions), CHASIDE_QUESTIONS, TIPOV_QUESTIONS, CIPR_QUESTIONS, MAGDALENA_QUESTIONS. 8. ResponseScale.options = Array<{value: number, label: string}>.",
+  "relevant_files": [
+    "web/lib/sessions.ts",
+    "web/lib/auth/staff.ts",
+    "web/lib/methods/registry.ts",
+    "web/lib/methods/types.ts",
+    "web/lib/methods/riasec-adapter.ts",
+    "web/lib/methods/chaside/data.ts",
+    "web/lib/methods/tipov/data.ts",
+    "web/lib/methods/cipr/data.ts",
+    "web/lib/methods/magdalena/data.ts",
+    "web/components/ReportsClient.tsx",
+    "web/components/AdminClient.tsx",
+    "web/app/admin/page.tsx",
+    "web/app/api/sessions/[id]/review/route.ts",
+    "web/tests/read-access.test.ts"
+  ],
+  "directory_structure": "web/app/ - Next.js App Router pages and API routes. web/lib/ - server-side logic (sessions, auth, methods, db). web/components/ - client components (ReportsClient.tsx ~1548 lines, AdminClient.tsx). web/data/ - seed data. web/tests/ - Vitest tests."
+}

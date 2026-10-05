@@ -1,0 +1,7 @@
+{
+  "task_id": "task-session-responses-detail",
+  "task_description": "Add per-session responses detail modal to 'Por Usuario' tab and full group export to 'Por Grupo' tab in ReportsClient. Includes new API route GET /api/sessions/[id]/responses and loadSessionResponses() in sessions.ts.",
+  "status": "in_progress",
+  "feature_order": ["FEAT-001", "FEAT-002"],
+  "blocked_reason": null
+}

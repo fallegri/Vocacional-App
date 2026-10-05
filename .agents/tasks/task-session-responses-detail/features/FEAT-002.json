@@ -1,0 +1,40 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Add 'Ver respuestas' detail modal to UsuarioTab in ReportsClient.tsx, and add a 'Exportar documento completo' button to GrupoTab that fetches all responses per session. Also wire staffToken prop through AdminClient -> ReportsClient.",
+  "status": "in_progress",
+  "steps": [
+    "Extract the SessionDetailModal into a new file web/components/SessionDetailModal.tsx (to avoid making ReportsClient too large). The modal receives: session: SessionSummary, onClose: () => void, staffToken: string | null. Inside the modal: fetch GET /api/sessions/{session.id}/responses with header x-staff-token=staffToken (if set) when it mounts. Show loading state ('Cargando respuestas...') then render table.",
+    "In SessionDetailModal.tsx: At module level (outside component), build a combined question bank lookup: type QuestionInfo = { text: string; dimension: string }. Build Map<string, Map<number, QuestionInfo>> keyed by methodId. Import METHODS from '@/lib/methods/registry' (pure data, no server deps). For each method, iterate method.questions and populate the inner map. Build a scale label lookup: Map<string, Map<number, string>> keyed by methodId. For each method, iterate method.scale.options and populate inner map.",
+    "In SessionDetailModal.tsx: Modal content: (1) Header with student name, email, phone, cohort, method label, dominant code, date. (2) Table with columns: Nº | Pregunta (text from question bank, or 'Pregunta #{id}' if not found) | Dimensión | Respuesta ('{score} — {label}') | Tiempo (ms). (3) 'Exportar respuestas CSV' button using exportCsv helper (inline or imported). CSV columns: Nº Pregunta, Texto, Dimensión, Respuesta (valor), Respuesta (etiqueta), Tiempo (ms). UTF-8 BOM. (4) Close button at top-right. (5) Click-outside handler (mousedown on overlay). All labels in Spanish.",
+    "In ReportsClient.tsx: Add optional staffToken prop to the ReportsClient component signature: { sessions, cohorts, staffToken }: { sessions: SessionSummary[]; cohorts: CohortGroup[]; staffToken?: string | null }. Pass staffToken down to UsuarioTab and GrupoTab.",
+    "In ReportsClient.tsx UsuarioTab: Add 'Ver respuestas' button in each table row (after existing 'Ver' link). On click: set selectedSession state, render <SessionDetailModal session={selectedSession} onClose={() => setSelectedSession(null)} staffToken={staffToken} />. Import SessionDetailModal.",
+    "In ReportsClient.tsx GrupoTab: Add second export button 'Exportar documento completo' next to existing 'Exportar CSV'. On click: show loading indicator ('Cargando respuestas...'). For each session in filtered, fetch GET /api/sessions/{id}/responses with x-staff-token header. Assemble a flat CSV where each response row includes: Estudiante, Correo, Teléfono, Grupo, Método, Código Dominante, Carrera Top, Fecha, Fiabilidad, Estado, Nº Pregunta, Texto Pregunta, Dimensión, Respuesta Valor, Respuesta Etiqueta, Tiempo (ms). If a session has no responses, include one row with empty response columns. Filename: 'reporte-completo-{grupo}-{date}.csv'. Use the same question bank + scale lookup maps (import them from SessionDetailModal.tsx or define them once at the top of ReportsClient.tsx).",
+    "In AdminClient.tsx: Update the ReportsClient call at line ~934 to pass staffToken. In AdminClient, the staffToken comes from STAFF_ACCESS_TOKEN env or null. Since AdminClient is 'use client', it cannot read process.env directly. Instead: add an optional staffToken prop to AdminClient ({ ..., staffToken?: string | null }) and pass it through. In web/app/admin/page.tsx (server component): read process.env.STAFF_ACCESS_TOKEN ?? null and pass as prop to AdminClient. AdminClient then passes it to ReportsClient. Note: this env read is in a server component and is always safe (no module-load-time risk)."
+  ],
+  "acceptance_criteria": [
+    "web/components/SessionDetailModal.tsx exists and renders a modal with session info + responses table + export button",
+    "Clicking 'Ver respuestas' in UsuarioTab opens the modal with that session's responses",
+    "Modal shows loading state ('Cargando respuestas...') while fetching",
+    "Modal has a close button and click-outside-to-close",
+    "Modal shows question text (from question bank lookup), dimension, score with label, and time",
+    "'Exportar respuestas CSV' in modal exports UTF-8 BOM CSV with correct columns",
+    "GrupoTab has 'Exportar documento completo' button that shows loading state then downloads flat CSV with all sessions x responses",
+    "Group CSV includes header: Estudiante, Correo, Teléfono, Grupo, Método, Código Dominante, Carrera Top, Fecha, Fiabilidad, Estado, Nº Pregunta, Texto Pregunta, Dimensión, Respuesta Valor, Respuesta Etiqueta, Tiempo (ms)",
+    "Sessions with no responses get one row with empty response columns in group export",
+    "staffToken is threaded from admin/page.tsx -> AdminClient -> ReportsClient -> modal/group export",
+    "All user-facing text in Spanish",
+    "tsc --noEmit passes with no type errors",
+    "npm run lint passes",
+    "npm run test -- --run passes",
+    "npm run build passes without env vars"
+  ],
+  "verification": [
+    "cd /projects/sandbox/Vocacional-App/web && npx tsc --noEmit",
+    "cd /projects/sandbox/Vocacional-App/web && npm run lint",
+    "cd /projects/sandbox/Vocacional-App/web && npm run test -- --run",
+    "cd /projects/sandbox/Vocacional-App/web && npm run build"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

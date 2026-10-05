@@ -37,6 +37,9 @@ export default async function AdminPage() {
     listUsers(),
   ]);
 
+  // Leído en tiempo de ejecución del servidor (nunca durante next build).
+  const staffToken = process.env.STAFF_ACCESS_TOKEN ?? null;
+
   return (
     <main className="container container-wide">
       <div style={{ marginBottom: 20 }}>
@@ -52,6 +55,7 @@ export default async function AdminPage() {
         initialSessions={sessions}
         initialUsers={users}
         currentUser={currentUser}
+        staffToken={staffToken}
       />
     </main>
   );

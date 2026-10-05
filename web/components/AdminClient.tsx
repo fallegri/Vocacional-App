@@ -76,6 +76,7 @@ export default function AdminClient({
   initialSessions,
   initialUsers,
   currentUser,
+  staffToken,
 }: {
   initialCohorts: CohortGroup[];
   initialSessions: SessionSummary[];
@@ -87,6 +88,8 @@ export default function AdminClient({
    * selector de rol de prueba heredado.
    */
   currentUser: { email: string; role: UserRoleCode } | null;
+  /** Token de acceso de personal para el encabezado x-staff-token en APIs protegidas. */
+  staffToken?: string | null;
 }) {
   // Selector de usuario/rol de PRUEBA: solo se usa en modo demo (sin auth).
   // Cuando hay sesión real (currentUser), la identidad y el rol vienen del
@@ -931,7 +934,7 @@ export default function AdminClient({
       ) : null}
 
       {tab === "reportes" ? (
-        <ReportsClient sessions={sessions} cohorts={cohorts} />
+        <ReportsClient sessions={sessions} cohorts={cohorts} staffToken={staffToken} />
       ) : null}
 
       {/* Diálogo de dictamen del revisor */}

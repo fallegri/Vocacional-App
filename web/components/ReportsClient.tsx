@@ -1,12 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { SessionSummary } from "@/lib/sessions";
+import type { SessionSummary, SessionResponse } from "@/lib/sessions";
 import {
   REVIEW_STATUS,
   type CohortGroup,
   type ReviewStatusCode,
 } from "@/lib/riasec/types";
+import SessionDetailModal, {
+  ALL_QUESTION_BANKS,
+  ALL_SCALE_LABELS,
+} from "@/components/SessionDetailModal";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -163,9 +167,11 @@ function CssBar({
 export default function ReportsClient({
   sessions,
   cohorts,
+  staffToken,
 }: {
   sessions: SessionSummary[];
   cohorts: CohortGroup[];
+  staffToken?: string | null;
 }) {
   const [activeTab, setActiveTab] = useState<ReportTab>("dashboard");
 
@@ -214,10 +220,10 @@ export default function ReportsClient({
       {activeTab === "dashboard" && (
         <DashboardTab sessions={sessions} cohorts={cohorts} />
       )}
-      {activeTab === "usuario" && <UsuarioTab sessions={sessions} />}
+      {activeTab === "usuario" && <UsuarioTab sessions={sessions} staffToken={staffToken} />}
       {activeTab === "area" && <AreaTab sessions={sessions} />}
       {activeTab === "grupo" && (
-        <GrupoTab sessions={sessions} cohorts={cohorts} />
+        <GrupoTab sessions={sessions} cohorts={cohorts} staffToken={staffToken} />
       )}
       {activeTab === "fecha" && <FechaTab sessions={sessions} />}
       {activeTab === "carrera" && <CarreraTab sessions={sessions} />}
@@ -484,8 +490,15 @@ function DashboardTab({
 // Por Usuario tab
 // ===========================================================================
 
-function UsuarioTab({ sessions }: { sessions: SessionSummary[] }) {
+function UsuarioTab({
+  sessions,
+  staffToken,
+}: {
+  sessions: SessionSummary[];
+  staffToken?: string | null;
+}) {
   const [userSearch, setUserSearch] = useState("");
+  const [detailSession, setDetailSession] = useState<SessionSummary | null>(null);
 
   const filtered = useMemo(() => {
     const q = userSearch.trim().toLowerCase();
@@ -571,6 +584,7 @@ function UsuarioTab({ sessions }: { sessions: SessionSummary[] }) {
                   "Fiabilidad",
                   "Estado",
                   "",
+                  "",
                 ].map((h, i) => (
                   <th
                     key={i}
@@ -634,11 +648,28 @@ function UsuarioTab({ sessions }: { sessions: SessionSummary[] }) {
                       Ver
                     </a>
                   </td>
+                  <td style={{ padding: "6px 8px" }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ fontSize: 12, padding: "2px 8px" }}
+                      onClick={() => setDetailSession(s)}
+                    >
+                      Ver respuestas
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+      {detailSession && (
+        <SessionDetailModal
+          session={detailSession}
+          onClose={() => setDetailSession(null)}
+          staffToken={staffToken}
+        />
       )}
     </div>
   );
@@ -886,11 +917,14 @@ function AreaTab({ sessions }: { sessions: SessionSummary[] }) {
 function GrupoTab({
   sessions,
   cohorts,
+  staffToken,
 }: {
   sessions: SessionSummary[];
   cohorts: CohortGroup[];
+  staffToken?: string | null;
 }) {
   const [selectedGroup, setSelectedGroup] = useState<string>("ALL");
+  const [exportingFull, setExportingFull] = useState(false);
 
   const filtered = useMemo(() => {
     if (selectedGroup === "ALL") return sessions;
@@ -977,13 +1011,110 @@ function GrupoTab({
     );
   };
 
+  const handleFullExport = async () => {
+    setExportingFull(true);
+    try {
+      const cohortLabel =
+        selectedGroup === "ALL" ? "todos" : selectedGroup.toLowerCase();
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const headers = [
+        "Estudiante",
+        "Correo",
+        "Teléfono",
+        "Grupo",
+        "Método",
+        "Código Dominante",
+        "Carrera Top",
+        "Fecha",
+        "Fiabilidad",
+        "Estado",
+        "Nº Pregunta",
+        "Texto Pregunta",
+        "Dimensión",
+        "Respuesta Valor",
+        "Respuesta Etiqueta",
+        "Tiempo (ms)",
+      ];
+      const rows: string[][] = [];
+      for (const s of filtered) {
+        const fetchHeaders: Record<string, string> = {};
+        if (staffToken) fetchHeaders["x-staff-token"] = staffToken;
+        let sessionResponses: SessionResponse[] = [];
+        try {
+          const res = await fetch(
+            `/api/sessions/${encodeURIComponent(s.id)}/responses`,
+            { headers: fetchHeaders }
+          );
+          if (res.ok) {
+            const data = (await res.json()) as { responses?: SessionResponse[] };
+            sessionResponses = data.responses ?? [];
+          }
+        } catch {
+          /* skip — row will have empty response columns */
+        }
+        const studentInfo = [
+          s.studentName ?? "",
+          s.studentEmail ?? "",
+          s.studentPhone ?? "",
+          s.cohortCode ?? "",
+          METHOD_LABELS[s.methodId] ?? s.methodId,
+          s.dominantCode ?? "",
+          s.methodId === "RIASEC" ? (s.topCareerTitle ?? "") : "",
+          s.completedAt
+            ? new Date(s.completedAt).toLocaleDateString("es-ES")
+            : "",
+          s.isValid ? "Alta" : "Baja",
+          reviewLabel(s.reviewStatus),
+        ];
+        if (sessionResponses.length === 0) {
+          rows.push([...studentInfo, "", "", "", "", "", ""]);
+        } else {
+          for (const r of sessionResponses) {
+            const qText =
+              ALL_QUESTION_BANKS.get(s.methodId)?.get(r.questionId)?.text ??
+              "Pregunta #" + r.questionId;
+            const rLabel =
+              ALL_SCALE_LABELS.get(s.methodId)?.get(r.score) ??
+              String(r.score);
+            rows.push([
+              ...studentInfo,
+              String(r.questionId),
+              qText,
+              r.dimensionCode,
+              String(r.score),
+              rLabel,
+              String(r.timeSpentMs),
+            ]);
+          }
+        }
+      }
+      exportCsv(
+        headers,
+        rows,
+        `reporte-completo-${cohortLabel}-${dateStr}.csv`
+      );
+    } finally {
+      setExportingFull(false);
+    }
+  };
+
   return (
     <div className="card stack" style={{ gap: 14 }}>
       <div className="row spread" style={{ alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <h2 style={{ margin: 0 }}>Reporte por Grupo</h2>
-        <button type="button" className="btn btn-secondary" onClick={handleExport}>
-          Exportar CSV
-        </button>
+        <div className="row" style={{ gap: 8 }}>
+          <button type="button" className="btn btn-secondary" onClick={handleExport}>
+            Exportar CSV
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={handleFullExport}
+            disabled={exportingFull}
+          >
+            {exportingFull ? "Cargando respuestas..." : "Exportar documento completo"}
+          </button>
+        </div>
       </div>
       <div>
         <label className="label" htmlFor="grupo-select">
