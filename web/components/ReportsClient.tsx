@@ -7,10 +7,14 @@ import {
   type CohortGroup,
   type ReviewStatusCode,
 } from "@/lib/riasec/types";
-import SessionDetailModal, {
+import SessionDetailModal from "@/components/SessionDetailModal";
+import {
   ALL_QUESTION_BANKS,
   ALL_SCALE_LABELS,
-} from "@/components/SessionDetailModal";
+  METHOD_LABELS as SHARED_METHOD_LABELS,
+  exportCsv as sharedExportCsv,
+  formatDateEs as sharedFormatDateEs,
+} from "@/lib/reports-utils";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,13 +33,8 @@ type ReportTab =
 // Constants
 // ---------------------------------------------------------------------------
 
-const METHOD_LABELS: Record<string, string> = {
-  RIASEC: "RIASEC (Holland)",
-  CHASIDE: "CHASIDE",
-  TIPOV: "TIPOV",
-  CIPR: "CIP-R",
-  MAGDALENA: "Test Magdalena Contreras",
-};
+// Re-use shared constant to keep a single source of truth.
+const METHOD_LABELS = SHARED_METHOD_LABELS;
 
 const ALL_METHODS = ["RIASEC", "CHASIDE", "TIPOV", "CIPR", "MAGDALENA"] as const;
 
@@ -62,37 +61,9 @@ const CHASIDE_LABELS: Record<string, string> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function exportCsv(headers: string[], rows: string[][], filename: string): void {
-  const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  const lines = [
-    headers.map(escape).join(","),
-    ...rows.map((row) => row.map(escape).join(",")),
-  ];
-  const blob = new Blob(["\uFEFF" + lines.join("\n")], {
-    type: "text/csv;charset=utf-8;",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-function formatDateEs(ms: number | null): string {
-  if (!ms) return "Sin fecha";
-  try {
-    return new Date(ms).toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  } catch {
-    return "Sin fecha";
-  }
-}
+// Use shared helpers from lib/reports-utils.ts.
+const exportCsv = sharedExportCsv;
+const formatDateEs = sharedFormatDateEs;
 
 function reviewLabel(status: string | null): string {
   if (!status) return REVIEW_STATUS.PENDING.displayName;
@@ -1036,10 +1007,14 @@ function GrupoTab({
         "Tiempo (ms)",
       ];
       const rows: string[][] = [];
-      for (const s of filtered) {
-        const fetchHeaders: Record<string, string> = {};
-        if (staffToken) fetchHeaders["x-staff-token"] = staffToken;
-        let sessionResponses: SessionResponse[] = [];
+
+      // Fetch responses for all sessions in batches of 5 to avoid serializing
+      // N round trips back to back while keeping server load manageable.
+      const BATCH_SIZE = 5;
+      const fetchHeaders: Record<string, string> = {};
+      if (staffToken) fetchHeaders["x-staff-token"] = staffToken;
+
+      const fetchResponses = async (s: SessionSummary): Promise<SessionResponse[]> => {
         try {
           const res = await fetch(
             `/api/sessions/${encodeURIComponent(s.id)}/responses`,
@@ -1047,11 +1022,26 @@ function GrupoTab({
           );
           if (res.ok) {
             const data = (await res.json()) as { responses?: SessionResponse[] };
-            sessionResponses = data.responses ?? [];
+            return data.responses ?? [];
           }
         } catch {
           /* skip — row will have empty response columns */
         }
+        return [];
+      };
+
+      // Process in batches
+      const allResponses: SessionResponse[][] = [];
+      for (let i = 0; i < filtered.length; i += BATCH_SIZE) {
+        const batch = filtered.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(batch.map(fetchResponses));
+        allResponses.push(...batchResults);
+      }
+
+      // Assemble rows
+      for (let idx = 0; idx < filtered.length; idx++) {
+        const s = filtered[idx];
+        const sessionResponses = allResponses[idx] ?? [];
         const studentInfo = [
           s.studentName ?? "",
           s.studentEmail ?? "",
@@ -1088,6 +1078,7 @@ function GrupoTab({
           }
         }
       }
+
       exportCsv(
         headers,
         rows,

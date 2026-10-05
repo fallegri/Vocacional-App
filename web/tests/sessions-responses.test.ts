@@ -23,12 +23,12 @@ beforeEach(() => {
 });
 
 describe("loadSessionResponses", () => {
-  it("(a) devuelve array vacío cuando la BD lanza un error", async () => {
+  it("(a) propaga el error cuando la BD lanza una excepción", async () => {
     mockQuery.mockRejectedValue(new Error("connection refused"));
 
-    const result = await loadSessionResponses("sesion-inexistente");
-
-    expect(result).toEqual([]);
+    await expect(loadSessionResponses("sesion-inexistente")).rejects.toThrow(
+      "connection refused"
+    );
   });
 
   it("(b) mapea correctamente los campos de una fila al tipo SessionResponse", async () => {

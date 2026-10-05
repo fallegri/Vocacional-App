@@ -299,23 +299,19 @@ export interface SessionResponse {
 
 /**
  * Carga todas las respuestas de una sesión ordenadas por pregunta.
- * Solo runtime. Si la consulta falla devuelve [] para no interrumpir la UI.
+ * Solo runtime. Lanza un error si la consulta falla (el llamador decide si
+ * maneja el caso o lo propaga como respuesta HTTP 500).
  */
 export async function loadSessionResponses(
   sessionId: string
 ): Promise<SessionResponse[]> {
-  let rows: Record<string, unknown>[] = [];
-  try {
-    rows = await query(
-      `SELECT question_id, dimension_code, score, time_spent_ms, answered_at
-         FROM assessment_responses
-        WHERE session_id = $1
-        ORDER BY question_id`,
-      [sessionId]
-    );
-  } catch {
-    return [];
-  }
+  const rows = await query(
+    `SELECT question_id, dimension_code, score, time_spent_ms, answered_at
+       FROM assessment_responses
+      WHERE session_id = $1
+      ORDER BY question_id`,
+    [sessionId]
+  );
 
   return rows.map((row) => ({
     questionId: Number(row.question_id),

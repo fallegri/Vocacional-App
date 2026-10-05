@@ -1,7 +1,14 @@
 {
   "task_id": "task-session-responses-detail",
   "task_description": "Add per-session responses detail modal to 'Por Usuario' tab and full group export to 'Por Grupo' tab in ReportsClient. Includes new API route GET /api/sessions/[id]/responses and loadSessionResponses() in sessions.ts.",
-  "status": "in_progress",
+  "status": "completed",
   "feature_order": ["FEAT-001", "FEAT-002"],
-  "blocked_reason": null
+  "blocked_reason": null,
+  "verification": {
+    "build": "pass",
+    "tests": "pass",
+    "test_quality": "pass",
+    "docker_build": "skipped",
+    "summary": "Semantic review fixes applied: (1) scope enforcement documented as accepted global-read pattern for staff (consistent with review route); (2) sequential N-fetch export replaced with batched Promise.all in groups of 5; (3) loadSessionResponses now throws on DB error instead of silently returning [], route returns 500; (4) duplicate METHOD_LABELS/exportCsv/formatDateEs/ALL_QUESTION_BANKS/ALL_SCALE_LABELS extracted to lib/reports-utils.ts, circular import eliminated; (5) route handler tests added in sessions-responses-route.test.ts covering 403/200/500/demo-mode; (6) staffToken gated on !isAuthConfigured() in admin/page.tsx. tsc --noEmit clean, lint clean, 160/160 tests pass (4 new route handler tests), npm run build clean."
+  }
 }

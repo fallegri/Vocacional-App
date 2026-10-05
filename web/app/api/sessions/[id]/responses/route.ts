@@ -11,6 +11,11 @@ export const runtime = "nodejs";
  * GET /api/sessions/{id}/responses
  *
  * Solo accesible para personal autorizado (REPORT_REVIEWER, SUPER_ADMIN, etc.).
+ *
+ * Nota sobre scope: todos los roles de personal tienen acceso de lectura a
+ * cualquier sesión, de forma coherente con el comportamiento de la ruta
+ * PATCH /api/sessions/{id}/review. Si en el futuro se necesitan restricciones
+ * por cohorte, se añadirá aquí una comprobación de membresía.
  */
 export async function GET(
   request: Request,
@@ -22,6 +27,13 @@ export async function GET(
   }
 
   const { id } = await params;
-  const responses = await loadSessionResponses(id);
-  return NextResponse.json({ responses });
+
+  try {
+    const responses = await loadSessionResponses(id);
+    return NextResponse.json({ responses });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Error al cargar las respuestas.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

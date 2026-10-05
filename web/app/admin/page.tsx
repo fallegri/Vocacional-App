@@ -38,7 +38,12 @@ export default async function AdminPage() {
   ]);
 
   // Leído en tiempo de ejecución del servidor (nunca durante next build).
-  const staffToken = process.env.STAFF_ACCESS_TOKEN ?? null;
+  // Solo se pasa al cliente cuando las credenciales NO están configuradas:
+  // con autenticación activa el token es inerte en el servidor y no debe
+  // exponerse en el HTML renderizado.
+  const staffToken = authConfigured
+    ? null
+    : (process.env.STAFF_ACCESS_TOKEN ?? null);
 
   return (
     <main className="container container-wide">
