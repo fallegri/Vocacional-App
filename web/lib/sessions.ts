@@ -286,6 +286,46 @@ export async function updateSessionReview(
   return rows.length;
 }
 
+/**
+ * Forma de cada respuesta individual almacenada en assessment_responses.
+ */
+export interface SessionResponse {
+  questionId: number;
+  dimensionCode: string;
+  score: number;
+  timeSpentMs: number;
+  answeredAt: number;
+}
+
+/**
+ * Carga todas las respuestas de una sesión ordenadas por pregunta.
+ * Solo runtime. Si la consulta falla devuelve [] para no interrumpir la UI.
+ */
+export async function loadSessionResponses(
+  sessionId: string
+): Promise<SessionResponse[]> {
+  let rows: Record<string, unknown>[] = [];
+  try {
+    rows = await query(
+      `SELECT question_id, dimension_code, score, time_spent_ms, answered_at
+         FROM assessment_responses
+        WHERE session_id = $1
+        ORDER BY question_id`,
+      [sessionId]
+    );
+  } catch {
+    return [];
+  }
+
+  return rows.map((row) => ({
+    questionId: Number(row.question_id),
+    dimensionCode: String(row.dimension_code ?? ""),
+    score: Number(row.score ?? 0),
+    timeSpentMs: Number(row.time_spent_ms ?? 0),
+    answeredAt: Number(row.answered_at ?? 0),
+  }));
+}
+
 /** Carga una sesión por id. Devuelve null si no existe. Solo runtime. */
 export async function loadSession(
   sessionId: string

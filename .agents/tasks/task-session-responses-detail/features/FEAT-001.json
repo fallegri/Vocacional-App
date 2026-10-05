@@ -1,0 +1,28 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Add loadSessionResponses() to sessions.ts and create GET /api/sessions/[id]/responses route. This is the backend foundation for both the per-user detail modal and the full group export.",
+  "status": "in_progress",
+  "steps": [
+    "In web/lib/sessions.ts: Add interface SessionResponse { questionId: number; dimensionCode: string; score: number; timeSpentMs: number; answeredAt: number; }. Export it.",
+    "In web/lib/sessions.ts: Add async function loadSessionResponses(sessionId: string): Promise<SessionResponse[]> that queries 'SELECT question_id, dimension_code, score, time_spent_ms, answered_at FROM assessment_responses WHERE session_id = $1 ORDER BY question_id' using query() from @/lib/db. Wrap in try/catch returning [] on error (same pattern as listSessions()). Map rows: { questionId: Number(row.question_id), dimensionCode: String(row.dimension_code ?? ''), score: Number(row.score ?? 0), timeSpentMs: Number(row.time_spent_ms ?? 0), answeredAt: Number(row.answered_at ?? 0) }. Export it.",
+    "Create file web/app/api/sessions/[id]/responses/route.ts. Export async function GET(request: Request, { params }: { params: { id: string } }). Call authorizeStaffRequest(request) from '@/lib/auth/staff'. If !auth.ok return NextResponse.json({ error: auth.error }, { status: 403 }). Otherwise call loadSessionResponses(params.id) and return NextResponse.json({ responses }). Use export const dynamic = 'force-dynamic'; export const runtime = 'nodejs'; at top.",
+    "In web/tests/sessions-responses.test.ts (new file): write Vitest unit tests for loadSessionResponses() by mocking the query() function from '@/lib/db'. Test: (a) returns empty array when db throws, (b) maps row fields correctly to SessionResponse shape, (c) returns empty array when no rows. Follow the pattern used in web/tests/engine.test.ts or web/tests/read-access.test.ts for mocking."
+  ],
+  "acceptance_criteria": [
+    "SessionResponse interface is exported from web/lib/sessions.ts",
+    "loadSessionResponses() is exported from web/lib/sessions.ts and follows the same lazy/safe pattern as listSessions()",
+    "GET /api/sessions/[id]/responses route exists at web/app/api/sessions/[id]/responses/route.ts",
+    "Route returns 403 when authorizeStaffRequest fails",
+    "Route returns { responses: SessionResponse[] } on success",
+    "All Vitest tests pass: npm run test -- --run",
+    "tsc --noEmit passes with no errors"
+  ],
+  "verification": [
+    "cd /projects/sandbox/Vocacional-App/web && npx tsc --noEmit",
+    "cd /projects/sandbox/Vocacional-App/web && npm run test -- --run",
+    "cd /projects/sandbox/Vocacional-App/web && npm run build"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
