@@ -2,7 +2,7 @@
   "id": "FEAT-002",
   "type": "feat",
   "description": "Add 'Ver respuestas' detail modal to UsuarioTab in ReportsClient.tsx, and add a 'Exportar documento completo' button to GrupoTab that fetches all responses per session. Also wire staffToken prop through AdminClient -> ReportsClient.",
-  "status": "in_progress",
+  "status": "completed",
   "steps": [
     "Extract the SessionDetailModal into a new file web/components/SessionDetailModal.tsx (to avoid making ReportsClient too large). The modal receives: session: SessionSummary, onClose: () => void, staffToken: string | null. Inside the modal: fetch GET /api/sessions/{session.id}/responses with header x-staff-token=staffToken (if set) when it mounts. Show loading state ('Cargando respuestas...') then render table.",
     "In SessionDetailModal.tsx: At module level (outside component), build a combined question bank lookup: type QuestionInfo = { text: string; dimension: string }. Build Map<string, Map<number, QuestionInfo>> keyed by methodId. Import METHODS from '@/lib/methods/registry' (pure data, no server deps). For each method, iterate method.questions and populate the inner map. Build a scale label lookup: Map<string, Map<number, string>> keyed by methodId. For each method, iterate method.scale.options and populate inner map.",
@@ -36,5 +36,5 @@
     "cd /projects/sandbox/Vocacional-App/web && npm run build"
   ],
   "blocked_reason": null,
-  "findings": ""
+  "findings": "Implemented successfully. ALL_QUESTION_BANKS and ALL_SCALE_LABELS are exported from SessionDetailModal.tsx and imported in ReportsClient.tsx. SessionResponse type import added to ReportsClient. staffToken threaded from server component admin/page.tsx through AdminClient to ReportsClient and down to both UsuarioTab (modal) and GrupoTab (full export). All verification steps passed: tsc --noEmit, lint, 156 tests, and build."
 }
