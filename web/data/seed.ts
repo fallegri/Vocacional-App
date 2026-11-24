@@ -91,7 +91,7 @@ export const QUESTIONS: AssessmentQuestion[] = [
 export const CAREERS: Career[] = [
   {
     id: 1,
-    title: "Ingeniería de Software e Inteligencia Artificial",
+    title: "Ingeniería de Software, Ingeniería de Sistemas, Inteligencia Artificial",
     areaName: "Tecnología e Informática",
     description:
       "Diseño, arquitectura y desarrollo de aplicaciones cloud, redes neuronales, plataformas web y sistemas autónomos escalables.",
@@ -115,10 +115,10 @@ export const CAREERS: Career[] = [
   },
   {
     id: 3,
-    title: "Diseño Digital, UX/UI y Producto",
+    title: "Diseño Gráfico, Diseño Digital, Diseño UX/UI y Producto",
     areaName: "Arte, Diseño y Comunicación",
     description:
-      "Investigación de usuarios, diseño de interfaces táctiles/web, prototipado interactivo y sistemas de diseño visual.",
+      "Ilustración, Maquetación, Impresión 3D, Impresión de materiales y Serigrafía, Investigación de usuarios, diseño de interfaces táctiles/web, prototipado interactivo y sistemas de diseño visual.",
     workEnvironment:
       "Agencias digitales, startups, estudios de videojuegos, laboratorios de innovación.",
     idealR: 25, idealI: 45, idealA: 95, idealS: 55, idealE: 45, idealC: 35,
@@ -175,10 +175,10 @@ export const CAREERS: Career[] = [
   },
   {
     id: 8,
-    title: "Ingeniería en Robótica y Mecatrónica",
+    title: "Ingeniería Mecánica automotriz, Ingeniería Mecánica, Ingeniería en Robótica y Mecatrónica",
     areaName: "Ingeniería y Fabricación",
     description:
-      "Integración de mecánica, electrónica, sensores de control y software para automatización industrial y robótica.",
+      "Integración de mecánica y mecánica automotriz, autotrónica, electrónica, sensores de control y software para automatización industrial y robótica.",
     workEnvironment:
       "Plantas automotrices, laboratorios aeroespaciales, almacenes automatizados, robótica médica.",
     idealR: 85, idealI: 85, idealA: 20, idealS: 15, idealE: 30, idealC: 60,
@@ -211,7 +211,7 @@ export const CAREERS: Career[] = [
   },
   {
     id: 11,
-    title: "Marketing Digital, Growth & E-commerce",
+    title: "Marketing Digital, Ingeniería Comercial, Growth & E-commerce",
     areaName: "Negocios y Comunicación",
     description:
       "Campañas de adquisición omnicanal, analítica web, embudos de conversión, branding y viralización.",
@@ -280,6 +280,18 @@ export const CAREERS: Career[] = [
     idealR: 20, idealI: 60, idealA: 50, idealS: 95, idealE: 45, idealC: 55,
     keySkills: ["Diseño Instruccional", "Metodologías Activas", "Empatía Pedagógica", "Tecnología Educativa"],
     futureTrends: "Plataformas de aprendizaje adaptativo personalizadas por IA y micro-credenciales.",
+  },
+  {
+    id: 17,
+    title: "Gastronomía, Artes Culinarias y Gestión de Restaurantes",
+    areaName: "Gastronomía y Hotelería",
+    description:
+      "Dominio de técnicas culinarias clásicas y de vanguardia, pastelería, panadería artesanal y cocina creativa. Incluye la gestión operativa de cocinas profesionales, dirección de brigadas y administración de restaurantes, cafeterías y servicios de catering.",
+    workEnvironment:
+      "Restaurantes de alta cocina, hoteles, cadenas gastronómicas, cocinas de producción, empresas de catering, emprendimientos propios.",
+    idealR: 75, idealI: 30, idealA: 70, idealS: 55, idealE: 65, idealC: 40,
+    keySkills: ["Técnicas Culinarias Clásicas y de Vanguardia", "Pastelería & Panadería", "Gestión de Cocina y Brigadas", "Costos y Administración de Restaurantes"],
+    futureTrends: "Cocina de autor basada en ingredientes locales, gastronomía sostenible y experiencias inmersivas de food & beverage.",
   },
 ];
 
